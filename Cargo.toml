@@ -1,0 +1,22 @@
+[package]
+name = "deribit-websocket"
+version = "0.1.0"
+edition = "2024"
+authors = ["Joaquin Bejar <jb@taunais.com>"]
+description = "WebSocket client for Deribit trading platform real-time data"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/joaquinbejar/deribit-websocket"
+homepage = "https://github.com/joaquinbejar/deribit-websocket"
+keywords = ["finance", "deribit", "trading", "websocket", "realtime"]
+categories = ["finance", "api-bindings", "web-programming::websocket"]
+
+[dependencies]
+#deribit-base = { path = "../deribit-base" }
+deribit-base = "0.1"
+tokio = { version = "1.0", features = ["full"] }
+tokio-tungstenite = { version = "0.27", features = ["native-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+async-trait = "0.1"
+futures-util = "0.3"

@@ -14,11 +14,7 @@
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://docs.rs/deribit-websocket)
 [![Wiki](https://img.shields.io/badge/wiki-latest-blue.svg)](https://deepwiki.com/joaquinbejar/deribit-websocket)
 
-## Deribit WebSocket Client
-
-This crate provides a WebSocket client for the Deribit trading platform.
-It implements the common traits from `deribit-base` and provides real-time
-market data and trading functionality through WebSocket connections.
+{{readme}}
 
 ## Contribution and Contact
 
