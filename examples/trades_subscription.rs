@@ -3,6 +3,7 @@
 //! This example demonstrates how to subscribe to real-time trade data
 //! and process individual trade events as they occur.
 
+use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use std::sync::{Arc, Mutex};
 
@@ -14,9 +15,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|_| "Failed to install crypto provider")?;
 
     // Initialize logging
-    env_logger::init();
+    unsafe {
+        std::env::set_var("DERIBIT_LOG_LEVEL", "DEBUG");
+    }
+    setup_logger();
 
-    println!("🚀 Starting Real-time Trades Subscription Example");
+    tracing::info!("🚀 Starting Real-time Trades Subscription Example");
 
     // Statistics tracking
     let trade_count = Arc::new(Mutex::new(0u32));
@@ -61,9 +65,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                         *volume += amount;
 
-                        println!(
+                        tracing::info!(
                             "💰 Trade #{}: {} {} @ {} (ID: {}, Time: {})",
-                            *count, direction, amount, price, trade_id, timestamp
+                            *count,
+                            direction,
+                            amount,
+                            price,
+                            trade_id,
+                            timestamp
                         );
                     }
                 } else if let Some(trade) = data.as_object() {
@@ -81,14 +90,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     *volume += amount;
 
-                    println!("💰 Trade #{}: {} {} @ {}", *count, direction, amount, price);
+                    tracing::info!("💰 Trade #{}: {} {} @ {}", *count, direction, amount, price);
                 }
             }
             Ok(())
         },
         |message: &str, error: &WebSocketError| {
-            println!("❌ Error processing trade message: {}", error);
-            println!(
+            tracing::error!("❌ Error processing trade message: {}", error);
+            tracing::error!(
                 "   Message preview: {}",
                 if message.len() > 100 {
                     format!("{}...", &message[..100])
@@ -100,12 +109,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Connect to server
-    println!("🔌 Connecting to Deribit WebSocket...");
+    tracing::info!("🔌 Connecting to Deribit WebSocket...");
     client.connect().await?;
-    println!("✅ Connected successfully");
+    tracing::info!("✅ Connected successfully");
 
     // Subscribe to trades channels
-    println!("📊 Subscribing to real-time trades...");
+    tracing::info!("📊 Subscribing to real-time trades...");
     let channels = vec![
         "trades.BTC-PERPETUAL.raw".to_string(),
         "trades.ETH-PERPETUAL.raw".to_string(),
@@ -113,14 +122,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     match client.subscribe(channels).await {
-        Ok(_) => println!("✅ Successfully subscribed to trades channels"),
-        Err(e) => println!("❌ Subscription failed: {}", e),
+        Ok(_) => tracing::info!("✅ Successfully subscribed to trades channels"),
+        Err(e) => tracing::error!("❌ Subscription failed: {}", e),
     }
 
     // Start message processing
-    println!("🎯 Listening for real-time trades (15 seconds)...");
-    println!("   - Each trade will show direction, amount, and price");
-    println!("   - Volume statistics will be tracked");
+    tracing::info!("🎯 Listening for real-time trades (15 seconds)...");
+    tracing::info!("   - Each trade will show direction, amount, and price");
+    tracing::info!("   - Volume statistics will be tracked");
 
     // Run the processing loop
     let processing_task = tokio::spawn(async move { client.start_message_processing_loop().await });
@@ -135,23 +144,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let final_trades = *trade_count.lock().unwrap();
     let final_volume = *total_volume.lock().unwrap();
 
-    println!("\n📊 Trade Statistics:");
-    println!("   💰 Total trades processed: {}", final_trades);
-    println!("   📈 Total volume: {:.4}", final_volume);
+    tracing::info!("\n📊 Trade Statistics:");
+    tracing::info!("   💰 Total trades processed: {}", final_trades);
+    tracing::info!("   📈 Total volume: {:.4}", final_volume);
     if final_trades > 0 {
-        println!(
+        tracing::info!(
             "   📊 Average trade size: {:.4}",
             final_volume / final_trades as f64
         );
     }
 
     if final_trades == 0 {
-        println!("\n💡 Tips for trade data:");
-        println!("   - Trade data depends on market activity");
-        println!("   - Try during active trading hours");
-        println!("   - BTC-PERPETUAL usually has the most activity");
+        tracing::info!("\n💡 Tips for trade data:");
+        tracing::info!("   - Trade data depends on market activity");
+        tracing::info!("   - Try during active trading hours");
+        tracing::info!("   - BTC-PERPETUAL usually has the most activity");
     }
 
-    println!("\n🎉 Real-time trades example completed!");
+    tracing::info!("\n🎉 Real-time trades example completed!");
     Ok(())
 }

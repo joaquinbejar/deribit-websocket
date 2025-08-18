@@ -3,6 +3,7 @@
 //! This example demonstrates how to subscribe to quote updates
 //! for instruments, showing bid/ask prices and sizes.
 
+use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use std::sync::{Arc, Mutex};
 
@@ -14,9 +15,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|_| "Failed to install crypto provider")?;
 
     // Initialize logging
-    env_logger::init();
+    unsafe {
+        std::env::set_var("DERIBIT_LOG_LEVEL", "DEBUG");
+    }
+    setup_logger();
 
-    println!("🚀 Starting Quote Subscription Example");
+    tracing::info!("🚀 Starting Quote Subscription Example");
 
     // Statistics tracking
     let quote_updates = Arc::new(Mutex::new(0u32));
@@ -39,24 +43,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut count = quote_count_clone.lock().unwrap();
                 *count += 1;
 
-                println!("💱 Quote Update #{}: Channel: {}", *count, channel);
+                tracing::info!("💱 Quote Update #{}: Channel: {}", *count, channel);
 
                 if let Some(data) = params.get("data") {
                     // Extract quote information
                     if let Some(best_bid_price) = data.get("best_bid_price") {
-                        println!("   📉 Best Bid Price: {}", best_bid_price);
+                        tracing::info!("   📉 Best Bid Price: {}", best_bid_price);
                     }
                     if let Some(best_bid_amount) = data.get("best_bid_amount") {
-                        println!("   📊 Best Bid Amount: {}", best_bid_amount);
+                        tracing::info!("   📊 Best Bid Amount: {}", best_bid_amount);
                     }
                     if let Some(best_ask_price) = data.get("best_ask_price") {
-                        println!("   📈 Best Ask Price: {}", best_ask_price);
+                        tracing::info!("   📈 Best Ask Price: {}", best_ask_price);
                     }
                     if let Some(best_ask_amount) = data.get("best_ask_amount") {
-                        println!("   📊 Best Ask Amount: {}", best_ask_amount);
+                        tracing::info!("   📊 Best Ask Amount: {}", best_ask_amount);
                     }
                     if let Some(timestamp) = data.get("timestamp") {
-                        println!("   ⏰ Timestamp: {}", timestamp);
+                        tracing::info!("   ⏰ Timestamp: {}", timestamp);
                     }
 
                     // Calculate spread if both prices available
@@ -66,20 +70,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ) {
                         let spread = ask - bid;
                         let spread_pct = (spread / bid) * 100.0;
-                        println!("   📏 Spread: {:.4} ({:.2}%)", spread, spread_pct);
+                        tracing::info!("   📏 Spread: {:.4} ({:.2}%)", spread, spread_pct);
                     }
 
                     // Extract instrument from channel name
                     let instrument = channel.strip_prefix("quote.").unwrap_or("unknown");
-                    println!("   🎯 Instrument: {}", instrument);
+                    tracing::info!("   🎯 Instrument: {}", instrument);
                 }
-                println!(); // Empty line for readability
             }
             Ok(())
         },
         |message: &str, error: &WebSocketError| {
-            println!("❌ Error processing quote message: {}", error);
-            println!(
+            tracing::info!("❌ Error processing quote message: {}", error);
+            tracing::info!(
                 "   Message preview: {}",
                 if message.len() > 100 {
                     format!("{}...", &message[..100])
@@ -91,12 +94,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Connect to server
-    println!("🔌 Connecting to Deribit WebSocket...");
+    tracing::info!("🔌 Connecting to Deribit WebSocket...");
     client.connect().await?;
-    println!("✅ Connected successfully");
+    tracing::info!("✅ Connected successfully");
 
     // Subscribe to quote channels
-    println!("📊 Subscribing to quotes...");
+    tracing::info!("📊 Subscribing to quotes...");
     let channels = vec![
         "quote.BTC-PERPETUAL".to_string(),
         "quote.ETH-PERPETUAL".to_string(),
@@ -105,14 +108,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     match client.subscribe(channels).await {
-        Ok(_) => println!("✅ Successfully subscribed to quotes"),
-        Err(e) => println!("❌ Subscription failed: {}", e),
+        Ok(_) => tracing::info!("✅ Successfully subscribed to quotes"),
+        Err(e) => tracing::info!("❌ Subscription failed: {}", e),
     }
 
     // Start message processing
-    println!("🎯 Listening for quote updates (15 seconds)...");
-    println!("   - Quotes show best bid/ask prices and amounts");
-    println!("   - Spread calculations are included");
+    tracing::info!("🎯 Listening for quote updates (15 seconds)...");
+    tracing::info!("   - Quotes show best bid/ask prices and amounts");
+    tracing::info!("   - Spread calculations are included");
 
     // Run the processing loop
     let processing_task = tokio::spawn(async move { client.start_message_processing_loop().await });
@@ -126,16 +129,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Display final statistics
     let final_updates = *quote_updates.lock().unwrap();
 
-    println!("\n📊 Quote Statistics:");
-    println!("   💱 Total quote updates: {}", final_updates);
+    tracing::info!("\n📊 Quote Statistics:");
+    tracing::info!("   💱 Total quote updates: {}", final_updates);
 
     if final_updates == 0 {
-        println!("\n💡 Tips for quote updates:");
-        println!("   - Quote updates show best bid/ask changes");
-        println!("   - Updates occur when order book top levels change");
-        println!("   - Perpetual instruments typically have the most activity");
+        tracing::info!("\n💡 Tips for quote updates:");
+        tracing::info!("   - Quote updates show best bid/ask changes");
+        tracing::info!("   - Updates occur when order book top levels change");
+        tracing::info!("   - Perpetual instruments typically have the most activity");
     }
 
-    println!("\n🎉 Quote subscription example completed!");
+    tracing::info!("\n🎉 Quote subscription example completed!");
     Ok(())
 }

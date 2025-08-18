@@ -77,11 +77,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set up message processing
     client.set_message_handler(
         |message| {
-            println!("Received: {}", message);
+            tracing::info!("Received: {}", message);
             Ok(())
         },
         |message, error| {
-            eprintln!("Error processing {}: {}", message, error);
+            tracing::error!("Error processing {}: {}", message, error);
         }
     );
 

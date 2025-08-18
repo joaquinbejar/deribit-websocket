@@ -5,6 +5,7 @@
 //!
 //! Note: This requires valid authentication credentials.
 
+use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use std::sync::{Arc, Mutex};
 
@@ -16,9 +17,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|_| "Failed to install crypto provider")?;
 
     // Initialize logging
-    env_logger::init();
+    unsafe {
+        std::env::set_var("DERIBIT_LOG_LEVEL", "DEBUG");
+    }
+    setup_logger();
 
-    println!("🚀 Starting User Trades Subscription Example");
+    tracing::info!("🚀 Starting User Trades Subscription Example");
 
     // Load environment variables
     dotenv::dotenv().ok();
@@ -50,50 +54,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut count = trade_count_clone.lock().unwrap();
                 *count += 1;
 
-                println!("🔄 User Trade #{}: Channel: {}", *count, channel);
+                tracing::info!("🔄 User Trade #{}: Channel: {}", *count, channel);
 
                 if let Some(data) = params.get("data") {
                     // Extract trade execution information
                     if let Some(trade_id) = data.get("trade_id") {
-                        println!("   🆔 Trade ID: {}", trade_id);
+                        tracing::info!("   🆔 Trade ID: {}", trade_id);
                     }
                     if let Some(order_id) = data.get("order_id") {
-                        println!("   📋 Order ID: {}", order_id);
+                        tracing::info!("   📋 Order ID: {}", order_id);
                     }
                     if let Some(instrument) = data.get("instrument_name") {
-                        println!("   🎯 Instrument: {}", instrument);
+                        tracing::info!("   🎯 Instrument: {}", instrument);
                     }
                     if let Some(direction) = data.get("direction") {
-                        println!("   ➡️  Direction: {}", direction);
+                        tracing::info!("   ➡️  Direction: {}", direction);
                     }
                     if let Some(amount) = data.get("amount") {
-                        println!("   📏 Amount: {}", amount);
+                        tracing::info!("   📏 Amount: {}", amount);
                     }
                     if let Some(price) = data.get("price") {
-                        println!("   💰 Price: {}", price);
+                        tracing::info!("   💰 Price: {}", price);
                     }
                     if let Some(fee) = data.get("fee") {
-                        println!("   💸 Fee: {}", fee);
+                        tracing::info!("   💸 Fee: {}", fee);
                     }
                     if let Some(timestamp) = data.get("timestamp") {
-                        println!("   ⏰ Timestamp: {}", timestamp);
+                        tracing::info!("   ⏰ Timestamp: {}", timestamp);
                     }
                     if let Some(profit_loss) = data.get("profit_loss").and_then(|p| p.as_f64()) {
                         let mut pnl = pnl_clone.lock().unwrap();
                         *pnl += profit_loss;
-                        println!("   📈 P&L: {:.4}", profit_loss);
+                        tracing::info!("   📈 P&L: {:.4}", profit_loss);
                     }
                     if let Some(mark_price) = data.get("mark_price") {
-                        println!("   🎯 Mark Price: {}", mark_price);
+                        tracing::info!("   🎯 Mark Price: {}", mark_price);
                     }
                 }
-                println!(); // Empty line for readability
             }
             Ok(())
         },
         |message: &str, error: &WebSocketError| {
-            println!("❌ Error processing user trade message: {}", error);
-            println!(
+            tracing::info!("❌ Error processing user trade message: {}", error);
+            tracing::info!(
                 "   Message preview: {}",
                 if message.len() > 100 {
                     format!("{}...", &message[..100])
@@ -105,22 +108,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Connect to server
-    println!("🔌 Connecting to Deribit WebSocket...");
+    tracing::info!("🔌 Connecting to Deribit WebSocket...");
     client.connect().await?;
-    println!("✅ Connected successfully");
+    tracing::info!("✅ Connected successfully");
 
     // Authenticate
-    println!("🔐 Authenticating...");
+    tracing::info!("🔐 Authenticating...");
     match client.authenticate(&client_id, &client_secret).await {
-        Ok(_) => println!("✅ Authentication successful"),
+        Ok(_) => tracing::info!("✅ Authentication successful"),
         Err(e) => {
-            println!("❌ Authentication failed: {}", e);
+            tracing::info!("❌ Authentication failed: {}", e);
             return Err(e.into());
         }
     }
 
     // Subscribe to user trades channels
-    println!("📊 Subscribing to user trades...");
+    tracing::info!("📊 Subscribing to user trades...");
     let channels = vec![
         "user.trades.any.any.raw".to_string(),       // All user trades
         "user.trades.BTC-PERPETUAL.raw".to_string(), // BTC perpetual trades
@@ -128,14 +131,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     match client.subscribe(channels).await {
-        Ok(_) => println!("✅ Successfully subscribed to user trades"),
-        Err(e) => println!("❌ Subscription failed: {}", e),
+        Ok(_) => tracing::info!("✅ Successfully subscribed to user trades"),
+        Err(e) => tracing::info!("❌ Subscription failed: {}", e),
     }
 
     // Start message processing
-    println!("🎯 Listening for trade executions (20 seconds)...");
-    println!("   - Trade executions will be displayed with P&L");
-    println!("   - Execute trades in another session to see updates");
+    tracing::info!("🎯 Listening for trade executions (20 seconds)...");
+    tracing::info!("   - Trade executions will be displayed with P&L");
+    tracing::info!("   - Execute trades in another session to see updates");
 
     // Run the processing loop
     let processing_task = tokio::spawn(async move { client.start_message_processing_loop().await });
@@ -150,18 +153,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let final_trades = *trade_count.lock().unwrap();
     let final_pnl = *total_pnl.lock().unwrap();
 
-    println!("\n📊 User Trade Statistics:");
-    println!("   🔄 Total trade executions: {}", final_trades);
-    println!("   📈 Total P&L: {:.4}", final_pnl);
+    tracing::info!("\n📊 User Trade Statistics:");
+    tracing::info!("   🔄 Total trade executions: {}", final_trades);
+    tracing::info!("   📈 Total P&L: {:.4}", final_pnl);
 
     if final_trades == 0 {
-        println!("\n💡 Tips for user trade updates:");
-        println!("   - User trades only occur when your orders are executed");
-        println!("   - Try placing and executing orders in another session");
-        println!("   - Make sure you're authenticated with valid credentials");
-        println!("   - Trade updates include execution details and P&L calculations");
+        tracing::info!("\n💡 Tips for user trade updates:");
+        tracing::info!("   - User trades only occur when your orders are executed");
+        tracing::info!("   - Try placing and executing orders in another session");
+        tracing::info!("   - Make sure you're authenticated with valid credentials");
+        tracing::info!("   - Trade updates include execution details and P&L calculations");
     }
 
-    println!("\n🎉 User trades subscription example completed!");
+    tracing::info!("\n🎉 User trades subscription example completed!");
     Ok(())
 }

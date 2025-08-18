@@ -3,6 +3,7 @@
 //! This example demonstrates how to subscribe to estimated expiration price updates
 //! for options and futures instruments.
 
+use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use std::sync::{Arc, Mutex};
 
@@ -14,9 +15,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|_| "Failed to install crypto provider")?;
 
     // Initialize logging
-    env_logger::init();
+    unsafe {
+        std::env::set_var("DERIBIT_LOG_LEVEL", "DEBUG");
+    }
+    setup_logger();
 
-    println!("🚀 Starting Estimated Expiration Price Subscription Example");
+    tracing::info!("🚀 Starting Estimated Expiration Price Subscription Example");
 
     // Statistics tracking
     let price_updates = Arc::new(Mutex::new(0u32));
@@ -39,36 +43,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut count = price_count_clone.lock().unwrap();
                 *count += 1;
 
-                println!(
+                tracing::info!(
                     "⏰ Expiration Price Update #{}: Channel: {}",
-                    *count, channel
+                    *count,
+                    channel
                 );
 
                 if let Some(data) = params.get("data") {
                     // Extract expiration price information
                     if let Some(estimated_price) = data.get("estimated_price") {
-                        println!("   💰 Estimated Price: {}", estimated_price);
+                        tracing::info!("   💰 Estimated Price: {}", estimated_price);
                     }
                     if let Some(timestamp) = data.get("timestamp") {
-                        println!("   ⏰ Timestamp: {}", timestamp);
+                        tracing::info!("   ⏰ Timestamp: {}", timestamp);
                     }
                     if let Some(seconds_to_expiry) = data.get("seconds_to_expiry") {
-                        println!("   ⏳ Seconds to Expiry: {}", seconds_to_expiry);
+                        tracing::info!("   ⏳ Seconds to Expiry: {}", seconds_to_expiry);
                     }
 
                     // Extract instrument from channel name
                     let instrument = channel
                         .strip_prefix("estimated_expiration_price.")
                         .unwrap_or("unknown");
-                    println!("   🎯 Instrument: {}", instrument);
+                    tracing::info!("   🎯 Instrument: {}", instrument);
                 }
-                println!(); // Empty line for readability
             }
             Ok(())
         },
         |message: &str, error: &WebSocketError| {
-            println!("❌ Error processing expiration price message: {}", error);
-            println!(
+            tracing::info!("❌ Error processing expiration price message: {}", error);
+            tracing::info!(
                 "   Message preview: {}",
                 if message.len() > 100 {
                     format!("{}...", &message[..100])
@@ -80,12 +84,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Connect to server
-    println!("🔌 Connecting to Deribit WebSocket...");
+    tracing::info!("🔌 Connecting to Deribit WebSocket...");
     client.connect().await?;
-    println!("✅ Connected successfully");
+    tracing::info!("✅ Connected successfully");
 
     // Subscribe to estimated expiration price channels
-    println!("📊 Subscribing to estimated expiration prices...");
+    tracing::info!("📊 Subscribing to estimated expiration prices...");
     let channels = vec![
         "estimated_expiration_price.btc_usd".to_string(),
         "estimated_expiration_price.eth_usd".to_string(),
@@ -95,14 +99,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     match client.subscribe(channels).await {
-        Ok(_) => println!("✅ Successfully subscribed to expiration prices"),
-        Err(e) => println!("❌ Subscription failed: {}", e),
+        Ok(_) => tracing::info!("✅ Successfully subscribed to expiration prices"),
+        Err(e) => tracing::info!("❌ Subscription failed: {}", e),
     }
 
     // Start message processing
-    println!("🎯 Listening for expiration price updates (15 seconds)...");
-    println!("   - Estimated expiration prices are used for options settlement");
-    println!("   - Updates show projected settlement prices");
+    tracing::info!("🎯 Listening for expiration price updates (15 seconds)...");
+    tracing::info!("   - Estimated expiration prices are used for options settlement");
+    tracing::info!("   - Updates show projected settlement prices");
 
     // Run the processing loop
     let processing_task = tokio::spawn(async move { client.start_message_processing_loop().await });
@@ -116,16 +120,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Display final statistics
     let final_updates = *price_updates.lock().unwrap();
 
-    println!("\n📊 Expiration Price Statistics:");
-    println!("   ⏰ Total expiration price updates: {}", final_updates);
+    tracing::info!("\n📊 Expiration Price Statistics:");
+    tracing::info!("   ⏰ Total expiration price updates: {}", final_updates);
 
     if final_updates == 0 {
-        println!("\n💡 Tips for expiration price updates:");
-        println!("   - Expiration prices are calculated for instruments nearing expiry");
-        println!("   - Updates are more frequent closer to expiration time");
-        println!("   - Try subscribing to instruments with upcoming expirations");
+        tracing::info!("\n💡 Tips for expiration price updates:");
+        tracing::info!("   - Expiration prices are calculated for instruments nearing expiry");
+        tracing::info!("   - Updates are more frequent closer to expiration time");
+        tracing::info!("   - Try subscribing to instruments with upcoming expirations");
     }
 
-    println!("\n🎉 Estimated expiration price subscription example completed!");
+    tracing::info!("\n🎉 Estimated expiration price subscription example completed!");
     Ok(())
 }

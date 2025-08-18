@@ -4,6 +4,7 @@
 //! - chart.trades.{instrument}.{resolution} for chart data
 //! - user.changes.{instrument}.{interval} for position changes
 
+use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use std::sync::{Arc, Mutex};
 
@@ -14,7 +15,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .install_default()
         .map_err(|_| "Failed to install crypto provider")?;
 
-    println!("🚀 Starting advanced subscriptions example...");
+    // Initialize logging
+    unsafe {
+        std::env::set_var("DERIBIT_LOG_LEVEL", "DEBUG");
+    }
+    setup_logger();
+
+    tracing::info!("🚀 Starting advanced subscriptions example...");
 
     // Create WebSocket client for testnet
     let config = WebSocketConfig::testnet();
@@ -47,9 +54,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             // Extract chart data
                             if let Some(data) = params.get("data") {
-                                println!("📊 Chart Data #{}: Channel: {}", *count, channel);
+                                tracing::info!("📊 Chart Data #{}: Channel: {}", *count, channel);
                                 if let Some(trades) = data.as_array() {
-                                    println!("   📈 Received {} trade points", trades.len());
+                                    tracing::info!("   📈 Received {} trade points", trades.len());
                                     // Process first trade point as example
                                     if let Some(first_trade) = trades.first()
                                         && let (Some(timestamp), Some(price), Some(amount)) = (
@@ -58,9 +65,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             first_trade.get("amount"),
                                         )
                                     {
-                                        println!(
+                                        tracing::info!(
                                             "   💰 Sample: Price: {}, Amount: {}, Time: {}",
-                                            price, amount, timestamp
+                                            price,
+                                            amount,
+                                            timestamp
                                         );
                                     }
                                 }
@@ -71,26 +80,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             // Extract position change data
                             if let Some(data) = params.get("data") {
-                                println!("🔄 Position Change #{}: Channel: {}", *count, channel);
+                                tracing::info!(
+                                    "🔄 Position Change #{}: Channel: {}",
+                                    *count,
+                                    channel
+                                );
 
                                 // Extract key position information
                                 if let Some(instrument) = data.get("instrument_name") {
-                                    println!("   📍 Instrument: {}", instrument);
+                                    tracing::info!("   📍 Instrument: {}", instrument);
                                 }
                                 if let Some(size) = data.get("size") {
-                                    println!("   📏 Position Size: {}", size);
+                                    tracing::info!("   📏 Position Size: {}", size);
                                 }
                                 if let Some(direction) = data.get("direction") {
-                                    println!("   ➡️  Direction: {}", direction);
+                                    tracing::info!("   ➡️  Direction: {}", direction);
                                 }
                                 if let Some(mark_price) = data.get("mark_price") {
-                                    println!("   💲 Mark Price: {}", mark_price);
+                                    tracing::info!("   💲 Mark Price: {}", mark_price);
                                 }
                             }
                         } else {
                             let mut count = other_count.lock().unwrap();
                             *count += 1;
-                            println!("📨 Other subscription #{}: {}", *count, channel);
+                            tracing::info!("📨 Other subscription #{}: {}", *count, channel);
                         }
                     }
                     Ok(())
@@ -102,8 +115,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         },
         |message: &str, error: &WebSocketError| {
-            println!("❌ Error processing message: {}", error);
-            println!(
+            tracing::info!("❌ Error processing message: {}", error);
+            tracing::info!(
                 "   Message preview: {}",
                 if message.len() > 100 {
                     format!("{}...", &message[..100])
@@ -115,12 +128,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Connect to server
-    println!("🔌 Connecting to Deribit WebSocket...");
+    tracing::info!("🔌 Connecting to Deribit WebSocket...");
     client.connect().await?;
-    println!("✅ Connected successfully!");
+    tracing::info!("✅ Connected successfully!");
 
     // Subscribe to advanced channels
-    println!("📡 Subscribing to advanced channels...");
+    tracing::info!("📡 Subscribing to advanced channels...");
 
     let channels = vec![
         // Chart data subscriptions for different resolutions
@@ -136,18 +149,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     match client.subscribe(channels).await {
-        Ok(_) => println!("✅ Successfully subscribed to all channels"),
+        Ok(_) => tracing::info!("✅ Successfully subscribed to all channels"),
         Err(e) => {
-            println!("❌ Subscription failed: {}", e);
-            println!("💡 Note: User channels require authentication");
+            tracing::info!("❌ Subscription failed: {}", e);
+            tracing::info!("💡 Note: User channels require authentication");
         }
     }
 
     // Start message processing
-    println!("🎯 Starting message processing...");
-    println!("   - Chart data will show trade aggregations");
-    println!("   - User changes will show position updates");
-    println!("   - Processing will run for 15 seconds...");
+    tracing::info!("🎯 Starting message processing...");
+    tracing::info!("   - Chart data will show trade aggregations");
+    tracing::info!("   - User changes will show position updates");
+    tracing::info!("   - Processing will run for 15 seconds...");
 
     // Run the processing loop for a limited time
     let processing_task = tokio::spawn(async move { client.start_message_processing_loop().await });
@@ -163,33 +176,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let final_changes = *user_changes_messages.lock().unwrap();
     let final_other = *other_messages.lock().unwrap();
 
-    println!("\n📊 Final Statistics:");
-    println!("   📈 Chart data messages: {}", final_chart);
-    println!("   🔄 Position change messages: {}", final_changes);
-    println!("   📨 Other subscription messages: {}", final_other);
-    println!(
+    tracing::info!("\n📊 Final Statistics:");
+    tracing::info!("   📈 Chart data messages: {}", final_chart);
+    tracing::info!("   🔄 Position change messages: {}", final_changes);
+    tracing::info!("   📨 Other subscription messages: {}", final_other);
+    tracing::info!(
         "   📈 Total messages processed: {}",
         final_chart + final_changes + final_other
     );
 
     if final_chart == 0 {
-        println!("\n💡 Tips for chart data:");
-        println!("   - Chart data may be sparse during low activity periods");
-        println!("   - Try different resolution values (1, 5, 15, 60, etc.)");
-        println!("   - Chart data aggregates trades over the specified interval");
+        tracing::info!("\n💡 Tips for chart data:");
+        tracing::info!("   - Chart data may be sparse during low activity periods");
+        tracing::info!("   - Try different resolution values (1, 5, 15, 60, etc.)");
+        tracing::info!("   - Chart data aggregates trades over the specified interval");
     }
 
     if final_changes == 0 {
-        println!("\n💡 Tips for user changes:");
-        println!("   - User changes require valid authentication");
-        println!("   - Position changes only occur when you have active positions");
-        println!("   - Try placing a small test order to generate position changes");
+        tracing::info!("\n💡 Tips for user changes:");
+        tracing::info!("   - User changes require valid authentication");
+        tracing::info!("   - Position changes only occur when you have active positions");
+        tracing::info!("   - Try placing a small test order to generate position changes");
     }
 
-    println!("\n🎉 Advanced subscriptions example completed!");
-    println!("📚 Channel formats implemented:");
-    println!("   📊 chart.trades.{{instrument}}.{{resolution}}");
-    println!("   🔄 user.changes.{{instrument}}.{{interval}}");
+    tracing::info!("\n🎉 Advanced subscriptions example completed!");
+    tracing::info!("📚 Channel formats implemented:");
+    tracing::info!("   📊 chart.trades.{{instrument}}.{{resolution}}");
+    tracing::info!("   🔄 user.changes.{{instrument}}.{{interval}}");
 
     Ok(())
 }

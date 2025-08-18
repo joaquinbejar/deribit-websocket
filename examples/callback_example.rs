@@ -4,6 +4,7 @@
 //! 1. Primary callback processes each message and returns Result<(), Error>
 //! 2. Error callback handles failures from the primary callback
 
+use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
@@ -16,9 +17,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|_| "Failed to install crypto provider")?;
 
     // Initialize logging
-    env_logger::init();
+    unsafe {
+        std::env::set_var("DERIBIT_LOG_LEVEL", "DEBUG");
+    }
+    setup_logger();
 
-    println!("🚀 Starting Deribit WebSocket Callback Example");
+    tracing::info!("🚀 Starting Deribit WebSocket Callback Example");
 
     // Shared state for tracking processed messages
     let processed_count = Arc::new(Mutex::new(0u32));
@@ -50,10 +54,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "unknown".to_string());
 
-                    println!("✅ Processed message #{}: type={}", *count, msg_type);
+                    tracing::info!("📨 Processing message #{}: {}", *count, msg_type);
 
                     // Simulate processing failure for demonstration (every 5th message)
                     if *count % 5 == 0 {
+                        tracing::warn!("⚠️ Simulating processing error for message #{}", *count);
                         return Err(WebSocketError::InvalidMessage(format!(
                             "Simulated processing error for message #{}",
                             *count
@@ -64,6 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(e) => {
                     // Failed to parse JSON
+                    tracing::error!("❌ Failed to parse JSON: {}", e);
                     Err(WebSocketError::InvalidMessage(format!(
                         "Failed to parse JSON: {}",
                         e
@@ -73,46 +79,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         // Error callback: handles failures from primary callback
         move |message: &str, error: &WebSocketError| {
+            tracing::error!("🔥 Error callback triggered!");
             let mut count = error_count_clone.lock().unwrap();
             *count += 1;
 
-            println!("❌ Error #{} processing message: {}", *count, error);
-            println!(
-                "   Message preview: {}",
-                if message.len() > 100 {
-                    format!("{}...", &message[..100])
-                } else {
-                    message.to_string()
-                }
-            );
+            // Log error details
+            let preview = if message.len() > 100 {
+                format!("{}...", &message[..100])
+            } else {
+                message.to_string()
+            };
+
+            tracing::error!("   Message preview: {}", preview);
 
             // Log error details or send to monitoring system
-            eprintln!("ERROR LOG: {}", error);
+            tracing::error!("   Error: {}", error);
         },
     );
 
     // Connect to server
-    println!("🔌 Connecting to Deribit WebSocket...");
+    tracing::info!("🔌 Connecting to Deribit WebSocket...");
     client.connect().await?;
-    println!("✅ Connected successfully");
+    tracing::info!("✅ Client created successfully");
 
     // Subscribe to some channels to generate messages
-    println!("📊 Subscribing to market data...");
+    tracing::info!("📡 Subscribing to market data channels...");
     let channels = vec![
         "ticker.BTC-PERPETUAL".to_string(),
         "book.BTC-PERPETUAL.100ms".to_string(),
     ];
 
     match client.subscribe(channels).await {
-        Ok(_) => println!("✅ Subscribed to channels"),
-        Err(e) => println!("❌ Subscription failed: {}", e),
+        Ok(_) => tracing::info!("✅ Subscribed to channels"),
+        Err(e) => tracing::error!("❌ Subscription failed: {}", e),
     }
 
     // Start the message processing loop
-    println!("🔄 Starting message processing loop...");
-    println!("   - Messages will be processed by the primary callback");
-    println!("   - Errors will be handled by the error callback");
-    println!("   - Processing will run for 10 seconds...");
+    tracing::info!("🛑 Stopping message processing...");
+    tracing::info!("   - Messages will be processed by the primary callback");
+    tracing::info!("   - Errors will be handled by the error callback");
+    tracing::info!("⏳ Processing messages for 15 seconds...");
 
     // Run the processing loop for a limited time
     let processing_task = tokio::spawn(async move { client.start_message_processing_loop().await });
@@ -127,15 +133,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let final_processed = *processed_count.lock().unwrap();
     let final_errors = *error_count.lock().unwrap();
 
-    println!("\n📊 Final Statistics:");
-    println!("   ✅ Successfully processed messages: {}", final_processed);
-    println!("   ❌ Messages with errors: {}", final_errors);
-    println!(
+    tracing::info!("📊 Final Statistics:");
+    tracing::info!("   💚 Successfully processed: {} messages", final_processed);
+    tracing::info!("   🔴 Errors encountered: {} messages", final_errors);
+    tracing::info!(
         "   📈 Total messages handled: {}",
         final_processed + final_errors
     );
 
-    println!("\n🎉 Callback example completed!");
+    tracing::info!("🎉 Callback example completed successfully!");
     Ok(())
 }
 
@@ -147,14 +153,14 @@ async fn example_with_builder() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create handler using builder pattern
     let handler = MessageHandlerBuilder::new()
-        .with_message_callback(|message| {
-            println!("Processing: {}", message);
+        .with_message_callback(|_message| {
+            tracing::info!("   📈 Success rate: {:.1}%", 0.0);
             // Your message processing logic here
             Ok(())
         })
-        .with_error_callback(|message, error| {
-            eprintln!("Error processing message: {}", error);
-            eprintln!("Message was: {}", message);
+        .with_error_callback(|message, _error| {
+            tracing::error!("🔥 Error callback triggered!");
+            tracing::error!("   Message preview: {}", message);
         })
         .build()?;
 

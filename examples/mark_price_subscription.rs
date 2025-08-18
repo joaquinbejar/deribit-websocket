@@ -3,6 +3,7 @@
 //! This example demonstrates how to subscribe to mark price updates
 //! for options instruments.
 
+use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use std::sync::{Arc, Mutex};
 
@@ -14,9 +15,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|_| "Failed to install crypto provider")?;
 
     // Initialize logging
-    env_logger::init();
+    unsafe {
+        std::env::set_var("DERIBIT_LOG_LEVEL", "DEBUG");
+    }
+    setup_logger();
 
-    println!("🚀 Starting Mark Price Subscription Example");
+    tracing::info!("🚀 Starting Mark Price Subscription Example");
 
     // Statistics tracking
     let mark_price_updates = Arc::new(Mutex::new(0u32));
@@ -39,48 +43,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut count = mark_count_clone.lock().unwrap();
                 *count += 1;
 
-                println!("🎯 Mark Price Update #{}: Channel: {}", *count, channel);
+                tracing::info!("🎯 Mark Price Update #{}: Channel: {}", *count, channel);
 
                 if let Some(data) = params.get("data") {
                     // Extract mark price information
                     if let Some(mark_price) = data.get("mark_price") {
-                        println!("   💰 Mark Price: {}", mark_price);
+                        tracing::info!("   💰 Mark Price: {}", mark_price);
                     }
                     if let Some(underlying_price) = data.get("underlying_price") {
-                        println!("   📊 Underlying Price: {}", underlying_price);
+                        tracing::info!("   📊 Underlying Price: {}", underlying_price);
                     }
                     if let Some(timestamp) = data.get("timestamp") {
-                        println!("   ⏰ Timestamp: {}", timestamp);
+                        tracing::info!("   ⏰ Timestamp: {}", timestamp);
                     }
                     if let Some(iv) = data.get("iv") {
-                        println!("   📈 Implied Volatility: {}", iv);
+                        tracing::info!("   📈 Implied Volatility: {}", iv);
                     }
                     if let Some(delta) = data.get("delta") {
-                        println!("   🔺 Delta: {}", delta);
+                        tracing::info!("   🔺 Delta: {}", delta);
                     }
                     if let Some(gamma) = data.get("gamma") {
-                        println!("   📐 Gamma: {}", gamma);
+                        tracing::info!("   📐 Gamma: {}", gamma);
                     }
                     if let Some(theta) = data.get("theta") {
-                        println!("   ⏳ Theta: {}", theta);
+                        tracing::info!("   ⏳ Theta: {}", theta);
                     }
                     if let Some(vega) = data.get("vega") {
-                        println!("   📊 Vega: {}", vega);
+                        tracing::info!("   📊 Vega: {}", vega);
                     }
 
                     // Extract instrument from channel name
                     let instrument = channel
                         .strip_prefix("markprice.options.")
                         .unwrap_or("unknown");
-                    println!("   🎯 Instrument: {}", instrument);
+                    tracing::info!("   🎯 Instrument: {}", instrument);
                 }
-                println!(); // Empty line for readability
             }
             Ok(())
         },
         |message: &str, error: &WebSocketError| {
-            println!("❌ Error processing mark price message: {}", error);
-            println!(
+            tracing::info!("❌ Error processing mark price message: {}", error);
+            tracing::info!(
                 "   Message preview: {}",
                 if message.len() > 100 {
                     format!("{}...", &message[..100])
@@ -92,12 +95,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Connect to server
-    println!("🔌 Connecting to Deribit WebSocket...");
+    tracing::info!("🔌 Connecting to Deribit WebSocket...");
     client.connect().await?;
-    println!("✅ Connected successfully");
+    tracing::info!("✅ Connected successfully");
 
     // Subscribe to mark price channels for options
-    println!("📊 Subscribing to mark prices...");
+    tracing::info!("📊 Subscribing to mark prices...");
     let channels = vec![
         "markprice.options.BTC-29MAR24-50000-C".to_string(),
         "markprice.options.BTC-29MAR24-60000-P".to_string(),
@@ -106,14 +109,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     match client.subscribe(channels).await {
-        Ok(_) => println!("✅ Successfully subscribed to mark prices"),
-        Err(e) => println!("❌ Subscription failed: {}", e),
+        Ok(_) => tracing::info!("✅ Successfully subscribed to mark prices"),
+        Err(e) => tracing::info!("❌ Subscription failed: {}", e),
     }
 
     // Start message processing
-    println!("🎯 Listening for mark price updates (15 seconds)...");
-    println!("   - Mark prices include Greeks (Delta, Gamma, Theta, Vega)");
-    println!("   - Used for options valuation and risk management");
+    tracing::info!("🎯 Listening for mark price updates (15 seconds)...");
+    tracing::info!("   - Mark prices include Greeks (Delta, Gamma, Theta, Vega)");
+    tracing::info!("   - Used for options valuation and risk management");
 
     // Run the processing loop
     let processing_task = tokio::spawn(async move { client.start_message_processing_loop().await });
@@ -127,17 +130,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Display final statistics
     let final_updates = *mark_price_updates.lock().unwrap();
 
-    println!("\n📊 Mark Price Statistics:");
-    println!("   🎯 Total mark price updates: {}", final_updates);
+    tracing::info!("\n📊 Mark Price Statistics:");
+    tracing::info!("   🎯 Total mark price updates: {}", final_updates);
 
     if final_updates == 0 {
-        println!("\n💡 Tips for mark price updates:");
-        println!("   - Mark prices are calculated for options instruments");
-        println!("   - Updates depend on underlying price movements and volatility");
-        println!("   - Try subscribing to active options with upcoming expirations");
-        println!("   - Check available options instruments first");
+        tracing::info!("\n💡 Tips for mark price updates:");
+        tracing::info!("   - Mark prices are calculated for options instruments");
+        tracing::info!("   - Updates depend on underlying price movements and volatility");
+        tracing::info!("   - Try subscribing to active options with upcoming expirations");
+        tracing::info!("   - Check available options instruments first");
     }
 
-    println!("\n🎉 Mark price subscription example completed!");
+    tracing::info!("\n🎉 Mark price subscription example completed!");
     Ok(())
 }

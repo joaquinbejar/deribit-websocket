@@ -3,6 +3,7 @@
 //! This example demonstrates how to subscribe to perpetual instrument updates
 //! including funding rates and perpetual-specific data.
 
+use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use std::sync::{Arc, Mutex};
 
@@ -14,9 +15,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|_| "Failed to install crypto provider")?;
 
     // Initialize logging
-    env_logger::init();
+    unsafe {
+        std::env::set_var("DERIBIT_LOG_LEVEL", "DEBUG");
+    }
+    setup_logger();
 
-    println!("🚀 Starting Perpetual Subscription Example");
+    tracing::info!("🚀 Starting Perpetual Subscription Example");
 
     // Statistics tracking
     let perpetual_updates = Arc::new(Mutex::new(0u32));
@@ -40,27 +44,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut count = perpetual_count_clone.lock().unwrap();
                 *count += 1;
 
-                println!("🔄 Perpetual Update #{}: Channel: {}", *count, channel);
+                tracing::info!("🔄 Perpetual Update #{}: Channel: {}", *count, channel);
 
                 if let Some(data) = params.get("data") {
                     // Extract perpetual information
                     if let Some(funding_8h) = data.get("funding_8h") {
-                        println!("   💰 Funding 8h: {}", funding_8h);
+                        tracing::info!("   💰 Funding 8h: {}", funding_8h);
                     }
                     if let Some(funding_rate) = data.get("funding_rate") {
-                        println!("   📊 Funding Rate: {}", funding_rate);
+                        tracing::info!("   📊 Funding Rate: {}", funding_rate);
                     }
                     if let Some(index_price) = data.get("index_price") {
-                        println!("   📈 Index Price: {}", index_price);
+                        tracing::info!("   📈 Index Price: {}", index_price);
                     }
                     if let Some(mark_price) = data.get("mark_price") {
-                        println!("   🎯 Mark Price: {}", mark_price);
+                        tracing::info!("   🎯 Mark Price: {}", mark_price);
                     }
                     if let Some(timestamp) = data.get("timestamp") {
-                        println!("   ⏰ Timestamp: {}", timestamp);
+                        tracing::info!("   ⏰ Timestamp: {}", timestamp);
                     }
                     if let Some(interest_rate) = data.get("interest_rate") {
-                        println!("   💹 Interest Rate: {}", interest_rate);
+                        tracing::info!("   💹 Interest Rate: {}", interest_rate);
                     }
 
                     // Extract instrument from channel name
@@ -68,15 +72,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .strip_prefix("perpetual.")
                         .and_then(|s| s.strip_suffix(".raw"))
                         .unwrap_or("unknown");
-                    println!("   🎯 Instrument: {}", instrument);
+                    tracing::info!("   🎯 Instrument: {}", instrument);
                 }
-                println!(); // Empty line for readability
             }
             Ok(())
         },
         |message: &str, error: &WebSocketError| {
-            println!("❌ Error processing perpetual message: {}", error);
-            println!(
+            tracing::info!("❌ Error processing perpetual message: {}", error);
+            tracing::info!(
                 "   Message preview: {}",
                 if message.len() > 100 {
                     format!("{}...", &message[..100])
@@ -88,12 +91,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Connect to server
-    println!("🔌 Connecting to Deribit WebSocket...");
+    tracing::info!("🔌 Connecting to Deribit WebSocket...");
     client.connect().await?;
-    println!("✅ Connected successfully");
+    tracing::info!("✅ Connected successfully");
 
     // Subscribe to perpetual channels
-    println!("📊 Subscribing to perpetual updates...");
+    tracing::info!("📊 Subscribing to perpetual updates...");
     let channels = vec![
         "perpetual.BTC-PERPETUAL.raw".to_string(),
         "perpetual.ETH-PERPETUAL.raw".to_string(),
@@ -101,14 +104,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     match client.subscribe(channels).await {
-        Ok(_) => println!("✅ Successfully subscribed to perpetual updates"),
-        Err(e) => println!("❌ Subscription failed: {}", e),
+        Ok(_) => tracing::info!("✅ Successfully subscribed to perpetual updates"),
+        Err(e) => tracing::info!("❌ Subscription failed: {}", e),
     }
 
     // Start message processing
-    println!("🎯 Listening for perpetual updates (15 seconds)...");
-    println!("   - Perpetual updates include funding rates and mark prices");
-    println!("   - Funding rates are crucial for perpetual contract trading");
+    tracing::info!("🎯 Listening for perpetual updates (15 seconds)...");
+    tracing::info!("   - Perpetual updates include funding rates and mark prices");
+    tracing::info!("   - Funding rates are crucial for perpetual contract trading");
 
     // Run the processing loop
     let processing_task = tokio::spawn(async move { client.start_message_processing_loop().await });
@@ -122,16 +125,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Display final statistics
     let final_updates = *perpetual_updates.lock().unwrap();
 
-    println!("\n📊 Perpetual Statistics:");
-    println!("   🔄 Total perpetual updates: {}", final_updates);
+    tracing::info!("\n📊 Perpetual Statistics:");
+    tracing::info!("   🔄 Total perpetual updates: {}", final_updates);
 
     if final_updates == 0 {
-        println!("\n💡 Tips for perpetual updates:");
-        println!("   - Perpetual updates include funding rate changes");
-        println!("   - Updates occur regularly, especially around funding times");
-        println!("   - BTC-PERPETUAL and ETH-PERPETUAL are the most active");
+        tracing::info!("\n💡 Tips for perpetual updates:");
+        tracing::info!("   - Perpetual updates include funding rate changes");
+        tracing::info!("   - Updates occur regularly, especially around funding times");
+        tracing::info!("   - BTC-PERPETUAL and ETH-PERPETUAL are the most active");
     }
 
-    println!("\n🎉 Perpetual subscription example completed!");
+    tracing::info!("\n🎉 Perpetual subscription example completed!");
     Ok(())
 }
