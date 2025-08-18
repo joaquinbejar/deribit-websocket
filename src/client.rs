@@ -159,25 +159,27 @@ impl DeribitWebSocketClient {
 
         // Wait for response (simplified - in real implementation would match by ID)
         let response_text = connection.receive().await?;
-        
+
         // Try to parse as JSON-RPC response first, then handle notifications
         let response: JsonRpcResponse = match serde_json::from_str(&response_text) {
             Ok(resp) => resp,
             Err(e) => {
                 // Check if this might be a notification (missing id field)
-                if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&response_text) {
-                    if json_val.get("method").is_some() && json_val.get("id").is_none() {
-                        // This is a notification, create a synthetic response
-                        return Ok(JsonRpcResponse {
-                            jsonrpc: "2.0".to_string(),
-                            id: serde_json::Value::Null,
-                            result: crate::model::JsonRpcResult::Success {
-                                result: json_val,
-                            },
-                        });
-                    }
+                if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&response_text)
+                    && json_val.get("method").is_some()
+                    && json_val.get("id").is_none()
+                {
+                    // This is a notification, create a synthetic response
+                    return Ok(JsonRpcResponse {
+                        jsonrpc: "2.0".to_string(),
+                        id: serde_json::Value::Null,
+                        result: crate::model::JsonRpcResult::Success { result: json_val },
+                    });
                 }
-                return Err(WebSocketError::InvalidMessage(format!("Failed to parse response: {}", e)));
+                return Err(WebSocketError::InvalidMessage(format!(
+                    "Failed to parse response: {}",
+                    e
+                )));
             }
         };
 
