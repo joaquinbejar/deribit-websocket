@@ -1,48 +1,130 @@
 //! # Deribit WebSocket Client
 //!
-//! This crate provides a comprehensive WebSocket client for the Deribit trading platform.
-//! It implements JSON-RPC over WebSocket with full support for:
+//! A high-performance, production-ready WebSocket client for the Deribit cryptocurrency derivatives exchange.
+//! This crate provides comprehensive real-time market data streaming, trading operations, and account management
+//! through Deribit's WebSocket API v2.
 //!
 //! ## Features
 //!
-//! - 🔌 **WebSocket Connection Management** - Robust connection handling with automatic reconnection
+//! - 🔌 **WebSocket Connection Management** - Robust connection handling with automatic reconnection and heartbeat
 //! - 📡 **JSON-RPC Protocol** - Complete JSON-RPC 2.0 implementation for Deribit API
-//! - 📊 **Real-time Subscriptions** - Market data, order updates, and trade notifications
-//! - 🔐 **Authentication** - Support for API key and signature-based authentication
-//! - 🛡️ **Error Handling** - Comprehensive error types and recovery mechanisms
-//! - ⚡ **Async/Await** - Full async support with tokio runtime
-//! - 📈 **Rate Limiting** - Built-in rate limiting to comply with Deribit API limits
-//! - 🧪 **Testing Support** - Complete test coverage and examples
+//! - 📊 **Real-time Market Data** - Live ticker, order book, trades, and chart data streaming
+//! - 📈 **Advanced Subscriptions** - Chart data aggregation and user position change notifications
+//! - 🔐 **Authentication** - Secure API key and signature-based authentication
+//! - 🛡️ **Error Handling** - Comprehensive error types with detailed recovery mechanisms
+//! - ⚡ **Async/Await** - Full async support with tokio runtime for high concurrency
+//! - 🔄 **Callback System** - Flexible message processing with primary and error callbacks
+//! - 📋 **Subscription Management** - Intelligent subscription tracking and channel management
+//! - 🧪 **Testing Support** - Complete test coverage with working examples
+//!
+//! ## Supported Subscription Channels
+//!
+//! ### Market Data Channels
+//! - `ticker.{instrument}` - Real-time ticker updates
+//! - `book.{instrument}.{group}` - Order book snapshots and updates
+//! - `trades.{instrument}` - Live trade executions
+//! - `chart.trades.{instrument}.{resolution}` - Aggregated chart data for technical analysis
+//!
+//! ### User Data Channels (Requires Authentication)
+//! - `user.orders` - Order status updates and fills
+//! - `user.trades` - User trade executions
+//! - `user.changes.{instrument}.{interval}` - Position and portfolio changes
 //!
 //! ## Protocol Support
 //!
-//! | Feature | Status |
-//! |---------|--------|
-//! | JSON-RPC over WebSocket | ✅ Full Support |
-//! | Real-time Subscriptions | ✅ Full Support |
-//! | Authentication | ✅ API Key + Signature |
-//! | Market Data | ✅ All Channels |
-//! | Trading Operations | ✅ Orders, Positions |
-//! | Account Management | ✅ Portfolio, Balances |
+//! | Feature | Status | Description |
+//! |---------|--------|-------------|
+//! | JSON-RPC over WebSocket | ✅ Full Support | Complete JSON-RPC 2.0 implementation |
+//! | Market Data Subscriptions | ✅ Full Support | All public channels supported |
+//! | User Data Subscriptions | ✅ Full Support | Private channels with authentication |
+//! | Chart Data Streaming | ✅ Full Support | Real-time OHLCV data aggregation |
+//! | Authentication | ✅ API Key + Signature | Secure credential-based auth |
+//! | Connection Management | ✅ Auto-reconnect | Robust connection handling |
+//! | Error Recovery | ✅ Comprehensive | Detailed error types and handling |
 //!
-//! ## Usage
+//! ## Quick Start
 //!
-//! The WebSocket client provides callback-based message handling where incoming messages
-//! are processed with a primary callback that returns a Result, and an error callback
-//! that handles any errors from the primary callback.
+//! ```rust,no_run
+//! use deribit_websocket::prelude::*;
 //!
-//! Basic usage involves:
-//! 1. Creating a WebSocket configuration (testnet or production)
-//! 2. Creating a client instance with the configuration
-//! 3. Setting up message and error callbacks for processing
-//! 4. Connecting to the Deribit WebSocket API
-//! 5. Subscribing to desired channels (market data, user data)
-//! 6. Starting the message processing loop
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Initialize crypto provider for TLS connections
+//!     rustls::crypto::aws_lc_rs::default_provider()
+//!         .install_default()
+//!         .map_err(|_| "Failed to install crypto provider")?;
 //!
-//! See the examples directory for complete working examples including:
-//! - Basic client usage with market data subscriptions
-//! - Callback-based message handling with error recovery
-//! - Authentication and user-specific data subscriptions
+//!     // Create client for testnet
+//!     let config = WebSocketConfig::testnet();
+//!     let mut client = DeribitWebSocketClient::new(config)?;
+//!
+//!     // Set up message processing
+//!     client.set_message_handler(
+//!         |message| {
+//!             println!("Received: {}", message);
+//!             Ok(())
+//!         },
+//!         |message, error| {
+//!             eprintln!("Error processing {}: {}", message, error);
+//!         }
+//!     );
+//!
+//!     // Connect and subscribe
+//!     client.connect().await?;
+//!     client.subscribe(vec!["ticker.BTC-PERPETUAL".to_string()]).await?;
+//!
+//!     // Start processing messages
+//!     client.start_message_processing_loop().await?;
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Advanced Usage
+//!
+//! The client supports advanced subscription patterns for professional trading applications:
+//!
+//! ### Chart Data Streaming
+//! ```rust,no_run
+//! # use deribit_websocket::prelude::*;
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # let config = WebSocketConfig::testnet();
+//! # let client = DeribitWebSocketClient::new(config)?;
+//! // Subscribe to 1-minute chart data for BTC perpetual
+//! client.subscribe(vec!["chart.trades.BTC-PERPETUAL.1".to_string()]).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ### Position Change Monitoring
+//! ```rust,no_run
+//! # use deribit_websocket::prelude::*;
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # let config = WebSocketConfig::testnet();
+//! # let client = DeribitWebSocketClient::new(config)?;
+//! // Monitor real-time position changes (requires authentication)
+//! client.authenticate("client_id", "client_secret").await?;
+//! client.subscribe(vec!["user.changes.BTC-PERPETUAL.raw".to_string()]).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Examples
+//!
+//! The crate includes comprehensive examples demonstrating:
+//! - **`basic_client.rs`** - Basic connection, subscription, and message handling
+//! - **`callback_example.rs`** - Advanced callback system with error handling
+//! - **`advanced_subscriptions.rs`** - Chart data and position change subscriptions
+//!
+//! ## Architecture
+//!
+//! The client is built with a modular architecture:
+//! - **Connection Layer** - Low-level WebSocket connection management
+//! - **Session Layer** - Protocol-aware session handling with authentication
+//! - **Message Layer** - JSON-RPC request/response and notification handling
+//! - **Subscription Layer** - Channel management and subscription tracking
+//! - **Callback Layer** - Flexible message processing with error recovery
 
 #![warn(missing_docs)]
 #![deny(unsafe_code)]
