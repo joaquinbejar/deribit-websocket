@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set up message handler for quote data
     client.set_message_handler(
         move |message: &str| -> Result<(), WebSocketError> {
-            if let Ok(json_msg) = serde_json::from_str::<serde_json::Value>(message)
+            if let Ok(json_msg) = serde_json::from_str::<Value>(message)
                 && let Some(method) = json_msg.get("method")
                 && method.as_str() == Some("subscription")
                 && let Some(params) = json_msg.get("params")

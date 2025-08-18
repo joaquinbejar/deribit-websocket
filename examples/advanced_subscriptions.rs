@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set up message handler with channel-specific processing
     client.set_message_handler(
         move |message: &str| {
-            match serde_json::from_str::<serde_json::Value>(message) {
+            match serde_json::from_str::<Value>(message) {
                 Ok(json) => {
                     // Check if this is a subscription notification
                     if let Some(method) = json.get("method")
