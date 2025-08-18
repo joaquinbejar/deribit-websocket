@@ -38,12 +38,18 @@ through Deribit's WebSocket API v2.
 #### Market Data Channels
 - `ticker.{instrument}` - Real-time ticker updates
 - `book.{instrument}.{group}` - Order book snapshots and updates
-- `trades.{instrument}` - Live trade executions
+- `trades.{instrument}.{interval}` - Live trade executions
 - `chart.trades.{instrument}.{resolution}` - Aggregated chart data for technical analysis
+- `quote.{instrument}` - Best bid/ask prices and amounts
+- `deribit_price_index.{currency}_usd` - Price index updates
+- `estimated_expiration_price.{instrument}` - Estimated expiration prices
+- `markprice.options.{instrument}` - Mark prices with Greeks for options
+- `perpetual.{instrument}.raw` - Perpetual contract data including funding rates
 
 #### User Data Channels (Requires Authentication)
-- `user.orders` - Order status updates and fills
-- `user.trades` - User trade executions
+- `user.orders.{instrument}.{interval}` - Order status updates and fills
+- `user.trades.{instrument}.{interval}` - User trade executions
+- `user.portfolio.{currency}` - Portfolio updates and balances
 - `user.changes.{instrument}.{interval}` - Position and portfolio changes
 
 ### Protocol Support
@@ -114,10 +120,58 @@ client.subscribe(vec!["user.changes.BTC-PERPETUAL.raw".to_string()]).await?;
 
 ### Examples
 
-The crate includes comprehensive examples demonstrating:
+The crate includes comprehensive examples demonstrating all subscription channels:
+
+#### Basic Examples
 - **`basic_client.rs`** - Basic connection, subscription, and message handling
 - **`callback_example.rs`** - Advanced callback system with error handling
 - **`advanced_subscriptions.rs`** - Chart data and position change subscriptions
+
+#### Market Data Examples
+- **`trades_subscription.rs`** - Real-time trade execution streaming
+- **`price_index_subscription.rs`** - Price index updates with statistics
+- **`quote_subscription.rs`** - Best bid/ask prices with spread calculations
+- **`perpetual_subscription.rs`** - Perpetual contract data and funding rates
+- **`mark_price_subscription.rs`** - Options mark prices with Greeks
+- **`expiration_price_subscription.rs`** - Estimated expiration prices
+
+#### User Data Examples (Require Authentication)
+- **`user_orders_subscription.rs`** - Order status and execution updates
+- **`user_trades_subscription.rs`** - User trade history with P&L tracking
+- **`portfolio_subscription.rs`** - Portfolio balance and position updates
+
+Run any example with:
+```bash
+cargo run --example basic_client
+```
+
+## Testing
+
+### Unit Tests
+
+Run unit tests with:
+
+```bash
+cargo test
+```
+
+### Integration Tests
+
+Integration tests require valid Deribit API credentials and are disabled by default. To run them:
+
+1. Create a `.env` file with your Deribit credentials:
+```bash
+DERIBIT_CLIENT_ID=your_client_id
+DERIBIT_CLIENT_SECRET=your_client_secret
+DERIBIT_WS_URL=wss://test.deribit.com/ws/api/v2  # or production URL
+```
+
+2. Run integration tests with the feature flag:
+```bash
+cargo test --features integration-tests
+```
+
+**Note**: Integration tests connect to live Deribit servers and require valid API credentials.
 
 ### Architecture
 
