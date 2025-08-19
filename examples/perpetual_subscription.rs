@@ -27,8 +27,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let perpetual_count_clone = perpetual_updates.clone();
 
     // Create client configuration
-    let config = WebSocketConfig::testnet();
-    let mut client = DeribitWebSocketClient::new(config)?;
+    let config = WebSocketConfig::default();
+    let mut client = DeribitWebSocketClient::new(&config)?;
 
     // Set up message handler for perpetual data
     client.set_message_handler(

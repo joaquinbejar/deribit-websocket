@@ -24,8 +24,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("🚀 Starting advanced subscriptions example...");
 
     // Create WebSocket client for testnet
-    let config = WebSocketConfig::testnet();
-    let mut client = DeribitWebSocketClient::new(config)?;
+    let config = WebSocketConfig::default();
+    let mut client = DeribitWebSocketClient::new(&config)?;
 
     // Statistics tracking
     let chart_messages = Arc::new(Mutex::new(0u32));

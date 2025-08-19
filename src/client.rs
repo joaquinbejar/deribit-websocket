@@ -13,19 +13,19 @@ use crate::{
         notification::NotificationHandler, request::RequestBuilder, response::ResponseHandler,
     },
     model::{
+        quote::*,
         subscription::SubscriptionManager,
-        ws_types::{JsonRpcRequest, JsonRpcResponse},
+        ws_types::{JsonRpcRequest, JsonRpcResponse, JsonRpcResult},
     },
     session::WebSocketSession,
 };
 
 /// WebSocket client for Deribit
 #[derive(Debug)]
-#[allow(dead_code)] // Fields will be used as implementation progresses
 pub struct DeribitWebSocketClient {
-    config: Arc<WebSocketConfig>,
+    pub config: Arc<WebSocketConfig>,
     connection: Arc<Mutex<WebSocketConnection>>,
-    session: Arc<WebSocketSession>,
+    pub session: Arc<WebSocketSession>,
     request_builder: Arc<Mutex<RequestBuilder>>,
     response_handler: Arc<ResponseHandler>,
     notification_handler: Arc<NotificationHandler>,
@@ -37,13 +37,14 @@ pub struct DeribitWebSocketClient {
 
 impl DeribitWebSocketClient {
     /// Create a new WebSocket client
-    pub fn new(config: WebSocketConfig) -> Result<Self, WebSocketError> {
+    pub fn new(config: &WebSocketConfig) -> Result<Self, WebSocketError> {
         let connection = Arc::new(Mutex::new(WebSocketConnection::new(config.ws_url.clone())));
         let session = Arc::new(WebSocketSession::new(config.clone()));
         let (tx, rx) = mpsc::unbounded_channel();
 
+        let config = Arc::new(config.clone());
         Ok(Self {
-            config: Arc::new(config),
+            config,
             connection,
             session,
             request_builder: Arc::new(Mutex::new(RequestBuilder::new())),
@@ -60,7 +61,7 @@ impl DeribitWebSocketClient {
     pub fn new_with_url(ws_url: String) -> Result<Self, WebSocketError> {
         let config = WebSocketConfig::with_url(&ws_url)
             .map_err(|e| WebSocketError::ConnectionFailed(format!("Invalid URL: {}", e)))?;
-        Self::new(config)
+        Self::new(&config)
     }
 
     /// Create a new WebSocket client for testnet
@@ -224,6 +225,147 @@ impl DeribitWebSocketClient {
         self.send_request(request).await
     }
 
+    /// Place mass quotes
+    pub async fn mass_quote(
+        &self,
+        request: MassQuoteRequest,
+    ) -> Result<MassQuoteResult, WebSocketError> {
+        // Validate the request first
+        request.validate().map_err(WebSocketError::InvalidMessage)?;
+
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_mass_quote_request(request)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        // Parse the response using WsResponse structure
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "Failed to parse mass quote response: {}",
+                    e
+                ))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Cancel quotes
+    pub async fn cancel_quotes(
+        &self,
+        request: CancelQuotesRequest,
+    ) -> Result<CancelQuotesResponse, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_cancel_quotes_request(request)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        // Parse the response using JsonRpcResult structure
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "Failed to parse cancel quotes response: {}",
+                    e
+                ))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Set MMP group configuration
+    pub async fn set_mmp_config(&self, config: MmpGroupConfig) -> Result<(), WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_set_mmp_config_request(config)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { .. } => Ok(()),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Get MMP group configuration
+    pub async fn get_mmp_config(
+        &self,
+        mmp_group: Option<String>,
+    ) -> Result<Vec<MmpGroupConfig>, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_get_mmp_config_request(mmp_group)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "Failed to parse MMP config response: {}",
+                    e
+                ))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Reset MMP group
+    pub async fn reset_mmp(&self, mmp_group: Option<String>) -> Result<(), WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_reset_mmp_request(mmp_group)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { .. } => Ok(()),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Get open orders (including quotes)
+    pub async fn get_open_orders(
+        &self,
+        currency: Option<String>,
+        kind: Option<String>,
+        type_filter: Option<String>,
+    ) -> Result<Vec<QuoteInfo>, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_get_open_orders_request(currency, kind, type_filter)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "Failed to parse open orders response: {}",
+                    e
+                ))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
     /// Set message handler with callbacks
     /// The message_callback processes each incoming message and returns Result<(), Error>
     /// The error_callback is called only when message_callback returns an error
@@ -316,5 +458,12 @@ impl DeribitWebSocketClient {
         channel
             .find('.')
             .map(|dot_pos| channel[dot_pos + 1..].to_string())
+    }
+}
+
+impl Default for DeribitWebSocketClient {
+    fn default() -> Self {
+        let config = WebSocketConfig::default();
+        Self::new(&config).unwrap()
     }
 }

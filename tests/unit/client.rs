@@ -5,25 +5,26 @@ use deribit_websocket::config::WebSocketConfig;
 
 #[test]
 fn test_client_creation() {
-    let config = WebSocketConfig::testnet();
-    let result = DeribitWebSocketClient::new(config);
+    let config = WebSocketConfig::default();
+    let result = DeribitWebSocketClient::new(&config);
 
     assert!(result.is_ok());
 }
 
 #[test]
 fn test_client_creation_with_custom_config() {
-    let config = WebSocketConfig::testnet()
+    let config = WebSocketConfig::default()
         .with_heartbeat_interval(std::time::Duration::from_secs(60))
         .with_max_reconnect_attempts(10);
 
-    let result = DeribitWebSocketClient::new(config);
+    let result = DeribitWebSocketClient::new(&config);
     assert!(result.is_ok());
 }
 
 #[test]
-fn test_client_new_testnet() {
-    let result = DeribitWebSocketClient::new_testnet();
+fn test_client_new_default() {
+    let config = WebSocketConfig::default();
+    let result = DeribitWebSocketClient::new(&config);
     assert!(result.is_ok());
 }
 
@@ -48,8 +49,8 @@ fn test_client_new_with_invalid_url() {
 
 #[tokio::test]
 async fn test_client_initial_connection_state() {
-    let config = WebSocketConfig::testnet();
-    let client = DeribitWebSocketClient::new(config).unwrap();
+    let config = WebSocketConfig::default();
+    let client = DeribitWebSocketClient::new(&config).unwrap();
 
     // Initially should not be connected
     assert!(!client.is_connected().await);
@@ -57,8 +58,8 @@ async fn test_client_initial_connection_state() {
 
 #[tokio::test]
 async fn test_client_subscription_management() {
-    let config = WebSocketConfig::testnet();
-    let client = DeribitWebSocketClient::new(config).unwrap();
+    let config = WebSocketConfig::default();
+    let client = DeribitWebSocketClient::new(&config).unwrap();
 
     // Initially should have no subscriptions
     let subscriptions = client.get_subscriptions().await;
@@ -67,8 +68,8 @@ async fn test_client_subscription_management() {
 
 #[test]
 fn test_client_message_handler_management() {
-    let config = WebSocketConfig::testnet();
-    let mut client = DeribitWebSocketClient::new(config).unwrap();
+    let config = WebSocketConfig::default();
+    let mut client = DeribitWebSocketClient::new(&config).unwrap();
 
     // Initially should not have a message handler
     assert!(!client.has_message_handler());
@@ -85,8 +86,8 @@ fn test_client_message_handler_management() {
 
 #[test]
 fn test_client_debug() {
-    let config = WebSocketConfig::testnet();
-    let client = DeribitWebSocketClient::new(config).unwrap();
+    let config = WebSocketConfig::default();
+    let client = DeribitWebSocketClient::new(&config).unwrap();
 
     let debug_str = format!("{:?}", client);
     assert!(debug_str.contains("DeribitWebSocketClient"));
@@ -94,8 +95,8 @@ fn test_client_debug() {
 
 #[test]
 fn test_client_parse_channel_type() {
-    let config = WebSocketConfig::testnet();
-    let _client = DeribitWebSocketClient::new(config).unwrap();
+    let config = WebSocketConfig::default();
+    let _client = DeribitWebSocketClient::new(&config).unwrap();
 
     // Test channel parsing through subscription management
     // This is an indirect test since parse_channel_type is private
@@ -111,8 +112,8 @@ fn test_client_parse_channel_type() {
 
 #[test]
 fn test_client_extract_instrument() {
-    let config = WebSocketConfig::testnet();
-    let _client = DeribitWebSocketClient::new(config).unwrap();
+    let config = WebSocketConfig::default();
+    let _client = DeribitWebSocketClient::new(&config).unwrap();
 
     // Test instrument extraction through subscription management
     let channels = [

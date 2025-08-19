@@ -26,4 +26,8 @@ pub enum WebSocketError {
     #[error("Heartbeat timeout")]
     /// Heartbeat timeout occurred
     HeartbeatTimeout,
+
+    #[error("API error {0}: {1}")]
+    /// API error with code and message
+    ApiError(i32, String),
 }

@@ -27,8 +27,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let price_count_clone = price_updates.clone();
 
     // Create client configuration
-    let config = WebSocketConfig::testnet();
-    let mut client = DeribitWebSocketClient::new(config)?;
+    setup_logger();
+    let mut client = DeribitWebSocketClient::default();
 
     // Set up message handler for expiration price data
     client.set_message_handler(

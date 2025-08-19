@@ -24,13 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("🚀 Starting User Trades Subscription Example");
 
-    // Load environment variables
-    dotenv::dotenv().ok();
-    let client_id = std::env::var("DERIBIT_CLIENT_ID")
-        .map_err(|_| "DERIBIT_CLIENT_ID environment variable not set")?;
-    let client_secret = std::env::var("DERIBIT_CLIENT_SECRET")
-        .map_err(|_| "DERIBIT_CLIENT_SECRET environment variable not set")?;
-
+    
     // Statistics tracking
     let trade_count = Arc::new(Mutex::new(0u32));
     let total_pnl = Arc::new(Mutex::new(0.0f64));
@@ -38,8 +32,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pnl_clone = total_pnl.clone();
 
     // Create client configuration
-    let config = WebSocketConfig::testnet();
-    let mut client = DeribitWebSocketClient::new(config)?;
+    let config = WebSocketConfig::default();
+    let mut client = DeribitWebSocketClient::new(&config)?;
 
     // Set up message handler for user trade data
     client.set_message_handler(
@@ -114,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Authenticate
     tracing::info!("🔐 Authenticating...");
-    match client.authenticate(&client_id, &client_secret).await {
+    match client.authenticate(&config.client_id.unwrap(), &config.client_secret.unwrap()).await {
         Ok(_) => tracing::info!("✅ Authentication successful"),
         Err(e) => {
             tracing::info!("❌ Authentication failed: {}", e);

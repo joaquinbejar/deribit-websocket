@@ -13,30 +13,11 @@ fn test_default_config() {
     assert_eq!(config.reconnect_delay, Duration::from_millis(1000));
 }
 
-#[test]
-fn test_testnet_config() {
-    let config = WebSocketConfig::testnet();
-
-    assert_eq!(config.ws_url.as_str(), "wss://test.deribit.com/ws/api/v2");
-    assert_eq!(config.heartbeat_interval, Duration::from_secs(30));
-    assert_eq!(config.max_reconnect_attempts, 5);
-    assert_eq!(config.reconnect_delay, Duration::from_millis(1000));
-}
-
-#[test]
-fn test_production_config() {
-    let config = WebSocketConfig::production();
-
-    assert_eq!(config.ws_url.as_str(), "wss://www.deribit.com/ws/api/v2");
-    assert_eq!(config.heartbeat_interval, Duration::from_secs(30));
-    assert_eq!(config.max_reconnect_attempts, 5);
-    assert_eq!(config.reconnect_delay, Duration::from_millis(1000));
-}
 
 #[test]
 fn test_custom_url_config() {
     let custom_url = "wss://custom.example.com/ws";
-    let config = deribit_websocket::config::WebSocketConfig::with_url(custom_url).unwrap();
+    let config = WebSocketConfig::with_url(custom_url).unwrap();
 
     assert_eq!(config.ws_url.as_str(), custom_url);
 }
@@ -44,14 +25,14 @@ fn test_custom_url_config() {
 #[test]
 fn test_invalid_url_config() {
     let invalid_url = "not-a-valid-url";
-    let result = deribit_websocket::config::WebSocketConfig::with_url(invalid_url);
+    let result = WebSocketConfig::with_url(invalid_url);
 
     assert!(result.is_err());
 }
 
 #[test]
 fn test_config_builder_pattern() {
-    let config = WebSocketConfig::testnet()
+    let config = WebSocketConfig::default()
         .with_heartbeat_interval(Duration::from_secs(60))
         .with_max_reconnect_attempts(10)
         .with_reconnect_delay(Duration::from_millis(2000));
@@ -63,7 +44,7 @@ fn test_config_builder_pattern() {
 
 #[test]
 fn test_config_chaining() {
-    let config = WebSocketConfig::production()
+    let config = WebSocketConfig::default()
         .with_heartbeat_interval(Duration::from_secs(45))
         .with_max_reconnect_attempts(3)
         .with_reconnect_delay(Duration::from_millis(500));
@@ -76,7 +57,7 @@ fn test_config_chaining() {
 
 #[test]
 fn test_config_clone() {
-    let original = WebSocketConfig::testnet().with_heartbeat_interval(Duration::from_secs(120));
+    let original = WebSocketConfig::default().with_heartbeat_interval(Duration::from_secs(120));
 
     let cloned = original.clone();
 
@@ -91,7 +72,7 @@ fn test_config_clone() {
 
 #[test]
 fn test_config_debug() {
-    let config = WebSocketConfig::testnet();
+    let config = WebSocketConfig::default();
     let debug_str = format!("{:?}", config);
 
     assert!(debug_str.contains("WebSocketConfig"));

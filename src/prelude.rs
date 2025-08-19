@@ -23,7 +23,13 @@ pub use crate::message::{
 };
 
 // Model types
-pub use crate::model::subscription::{Subscription, SubscriptionManager};
+pub use crate::model::{
+    quote::{
+        CancelQuotesRequest, CancelQuotesResponse, MassQuoteRequest, MassQuoteResult,
+        MmpGroupConfig, MmpGroupStatus, MmpTrigger, Quote, QuoteError, QuoteInfo,
+    },
+    subscription::{Subscription, SubscriptionManager},
+};
 
 // Session management
 pub use crate::session::WebSocketSession;

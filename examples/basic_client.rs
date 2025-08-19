@@ -25,12 +25,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("🚀 Starting Deribit WebSocket Client Example");
 
     // Create client configuration for testnet
-    let config = WebSocketConfig::testnet()
+    let config = WebSocketConfig::default()
         .with_heartbeat_interval(std::time::Duration::from_secs(30))
         .with_max_reconnect_attempts(3);
 
     // Create the WebSocket client
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
     tracing::info!("✅ Client created successfully");
 
     // Connect to the server

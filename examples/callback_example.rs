@@ -33,8 +33,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let error_count_clone = error_count.clone();
 
     // Create client configuration
-    let config = WebSocketConfig::testnet();
-    let mut client = DeribitWebSocketClient::new(config)?;
+    setup_logger();
+    let mut client = DeribitWebSocketClient::default();
 
     // Set up callback system
     client.set_message_handler(
@@ -145,30 +145,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// Alternative example using the builder pattern
-#[allow(dead_code)]
-async fn example_with_builder() -> Result<(), Box<dyn std::error::Error>> {
-    let config = WebSocketConfig::testnet();
-    let mut client = DeribitWebSocketClient::new(config)?;
 
-    // Create handler using builder pattern
-    let handler = MessageHandlerBuilder::new()
-        .with_message_callback(|_message| {
-            tracing::info!("   📈 Success rate: {:.1}%", 0.0);
-            // Your message processing logic here
-            Ok(())
-        })
-        .with_error_callback(|message, _error| {
-            tracing::error!("🔥 Error callback triggered!");
-            tracing::error!("   Message preview: {}", message);
-        })
-        .build()?;
-
-    client.set_message_handler_builder(handler);
-    client.connect().await?;
-
-    // Process messages
-    client.start_message_processing_loop().await?;
-
-    Ok(())
-}

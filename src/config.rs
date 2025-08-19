@@ -1,5 +1,6 @@
 //! Configuration for WebSocket client
 
+use std::env;
 use std::time::Duration;
 use url::Url;
 
@@ -14,35 +15,87 @@ pub struct WebSocketConfig {
     pub max_reconnect_attempts: u32,
     /// Reconnection delay
     pub reconnect_delay: Duration,
+    /// Connection timeout
+    pub connection_timeout: Duration,
+    /// Enable logging
+    pub enable_logging: bool,
+    /// Log level
+    pub log_level: String,
+    /// Test mode
+    pub test_mode: bool,
+    /// Client ID for authentication
+    pub client_id: Option<String>,
+    /// Client secret for authentication
+    pub client_secret: Option<String>,
 }
 
 impl Default for WebSocketConfig {
     fn default() -> Self {
+        // Load environment variables from .env file if it exists
+        {
+            if dotenv::dotenv().is_err() {
+                // .env file not found or error loading, continue with system env vars
+            }
+        }
+
+        let ws_url = env::var("DERIBIT_WS_URL")
+            .unwrap_or_else(|_| "wss://www.deribit.com/ws/api/v2".to_string());
+
+        let heartbeat_interval = env::var("DERIBIT_HEARTBEAT_INTERVAL")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .map(Duration::from_secs)
+            .unwrap_or_else(|| Duration::from_secs(30));
+
+        let max_reconnect_attempts = env::var("DERIBIT_RECONNECT_ATTEMPTS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(3);
+
+        let reconnect_delay = env::var("DERIBIT_RECONNECT_DELAY")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .map(Duration::from_secs)
+            .unwrap_or_else(|| Duration::from_secs(5));
+
+        let connection_timeout = env::var("DERIBIT_CONNECTION_TIMEOUT")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .map(Duration::from_secs)
+            .unwrap_or_else(|| Duration::from_secs(10));
+
+        let enable_logging = env::var("DERIBIT_ENABLE_LOGGING")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(true);
+
+        let log_level = env::var("DERIBIT_LOG_LEVEL").unwrap_or_else(|_| "info".to_string());
+
+        let test_mode = env::var("DERIBIT_TEST_MODE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(false);
+
+        let client_id = env::var("DERIBIT_CLIENT_ID").ok();
+        let client_secret = env::var("DERIBIT_CLIENT_SECRET").ok();
+
         Self {
-            ws_url: Url::parse("wss://test.deribit.com/ws/api/v2").unwrap(),
-            heartbeat_interval: Duration::from_secs(30),
-            max_reconnect_attempts: 5,
-            reconnect_delay: Duration::from_millis(1000),
+            ws_url: Url::parse(&ws_url)
+                .unwrap_or_else(|_| Url::parse("wss://www.deribit.com/ws/api/v2").unwrap()),
+            heartbeat_interval,
+            max_reconnect_attempts,
+            reconnect_delay,
+            connection_timeout,
+            enable_logging,
+            log_level,
+            test_mode,
+            client_id,
+            client_secret,
         }
     }
 }
 
 impl WebSocketConfig {
-    /// Create a new configuration for testnet
-    pub fn testnet() -> Self {
-        Self {
-            ws_url: Url::parse("wss://test.deribit.com/ws/api/v2").unwrap(),
-            ..Default::default()
-        }
-    }
-
-    /// Create a new configuration for production
-    pub fn production() -> Self {
-        Self {
-            ws_url: Url::parse("wss://www.deribit.com/ws/api/v2").unwrap(),
-            ..Default::default()
-        }
-    }
 
     /// Create a new configuration with custom URL
     pub fn with_url(url: &str) -> Result<Self, url::ParseError> {
@@ -68,5 +121,61 @@ impl WebSocketConfig {
     pub fn with_reconnect_delay(mut self, delay: Duration) -> Self {
         self.reconnect_delay = delay;
         self
+    }
+
+    /// Set connection timeout
+    pub fn with_connection_timeout(mut self, timeout: Duration) -> Self {
+        self.connection_timeout = timeout;
+        self
+    }
+
+    /// Set client credentials
+    pub fn with_credentials(mut self, client_id: String, client_secret: String) -> Self {
+        self.client_id = Some(client_id);
+        self.client_secret = Some(client_secret);
+        self
+    }
+
+    /// Set client ID
+    pub fn with_client_id(mut self, client_id: String) -> Self {
+        self.client_id = Some(client_id);
+        self
+    }
+
+    /// Set client secret
+    pub fn with_client_secret(mut self, client_secret: String) -> Self {
+        self.client_secret = Some(client_secret);
+        self
+    }
+
+    /// Enable or disable logging
+    pub fn with_logging(mut self, enable: bool) -> Self {
+        self.enable_logging = enable;
+        self
+    }
+
+    /// Set log level
+    pub fn with_log_level(mut self, level: String) -> Self {
+        self.log_level = level;
+        self
+    }
+
+    /// Set test mode
+    pub fn with_test_mode(mut self, test_mode: bool) -> Self {
+        self.test_mode = test_mode;
+        self
+    }
+
+    /// Check if credentials are available
+    pub fn has_credentials(&self) -> bool {
+        self.client_id.is_some() && self.client_secret.is_some()
+    }
+
+    /// Get client credentials as tuple
+    pub fn get_credentials(&self) -> Option<(&str, &str)> {
+        match (&self.client_id, &self.client_secret) {
+            (Some(id), Some(secret)) => Some((id, secret)),
+            _ => None,
+        }
     }
 }
