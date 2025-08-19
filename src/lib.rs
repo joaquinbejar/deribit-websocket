@@ -56,8 +56,8 @@
 //!         .map_err(|_| "Failed to install crypto provider")?;
 //!
 //!     // Create client for testnet
-//!     let config = WebSocketConfig::testnet();
-//!     let mut client = DeribitWebSocketClient::new(config)?;
+//!     let config = WebSocketConfig::default();
+//!     let mut client = DeribitWebSocketClient::new(&config)?;
 //!
 //!     // Set up message processing
 //!     client.set_message_handler(
@@ -89,8 +89,8 @@
 //! # use deribit_websocket::prelude::*;
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # let config = WebSocketConfig::testnet();
-//! # let client = DeribitWebSocketClient::new(config)?;
+//! # let config = WebSocketConfig::default();
+//! # let client = DeribitWebSocketClient::new(&config)?;
 //! // Subscribe to 1-minute chart data for BTC perpetual
 //! client.subscribe(vec!["chart.trades.BTC-PERPETUAL.1".to_string()]).await?;
 //! # Ok(())
@@ -102,8 +102,8 @@
 //! # use deribit_websocket::prelude::*;
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # let config = WebSocketConfig::testnet();
-//! # let client = DeribitWebSocketClient::new(config)?;
+//! # let config = WebSocketConfig::default();
+//! # let client = DeribitWebSocketClient::new(&config)?;
 //! // Monitor real-time position changes (requires authentication)
 //! client.authenticate("client_id", "client_secret").await?;
 //! client.subscribe(vec!["user.changes.BTC-PERPETUAL.raw".to_string()]).await?;
@@ -116,8 +116,8 @@
 //! # use deribit_websocket::prelude::*;
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # let config = WebSocketConfig::testnet();
-//! # let mut client = DeribitWebSocketClient::new(config)?;
+//! # let config = WebSocketConfig::default();
+//! # let mut client = DeribitWebSocketClient::new(&config)?;
 //! # client.connect().await?;
 //! # client.authenticate("client_id", "client_secret").await?;
 //! // Set up MMP group for mass quoting

@@ -16,7 +16,7 @@ use deribit_websocket::prelude::*;
 
 /// Check if .env file exists and contains required variables
 fn check_env_file() -> Result<(), Box<dyn std::error::Error>> {
-    if !Path::new(".env").exists() {
+    if !Path::new("../../../.env.backup").exists() {
         return Err(
             "Missing .env file. Please create one with DERIBIT_CLIENT_ID and DERIBIT_CLIENT_SECRET"
                 .into(),
@@ -64,7 +64,7 @@ async fn test_secure_websocket_connection() -> Result<(), Box<dyn std::error::Er
     }
 
     let config = deribit_websocket::config::WebSocketConfig::with_url(&ws_url)?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
 
     info!("🔒 Establishing secure WebSocket connection...");
     let connect_result = client.connect().await;
@@ -119,7 +119,7 @@ async fn test_ssl_certificate_validation() -> Result<(), Box<dyn std::error::Err
     // Test secure connection (wss://)
     info!("🔒 Testing secure connection (wss://)...");
     let secure_config = deribit_websocket::config::WebSocketConfig::with_url(&ws_url)?;
-    let secure_client = DeribitWebSocketClient::new(secure_config)?;
+    let secure_client = DeribitWebSocketClient::new(&secure_config)?;
 
     let secure_result = secure_client.connect().await;
     match secure_result {
@@ -154,7 +154,7 @@ async fn test_insecure_to_secure_upgrade() -> Result<(), Box<dyn std::error::Err
     // Test secure connection (wss://)
     info!("🔒 Testing secure connection (wss://)...");
     let secure_config = deribit_websocket::config::WebSocketConfig::with_url(&ws_url)?;
-    let secure_client = DeribitWebSocketClient::new(secure_config)?;
+    let secure_client = DeribitWebSocketClient::new(&secure_config)?;
 
     let secure_result = secure_client.connect().await;
     match secure_result {
@@ -177,7 +177,7 @@ async fn test_insecure_to_secure_upgrade() -> Result<(), Box<dyn std::error::Err
         info!("🔓 Testing insecure connection (ws://) for comparison...");
 
         let insecure_config = deribit_websocket::config::WebSocketConfig::with_url(&insecure_url)?;
-        let insecure_client = DeribitWebSocketClient::new(insecure_config)?;
+        let insecure_client = DeribitWebSocketClient::new(&insecure_config)?;
 
         let insecure_result = timeout(Duration::from_secs(5), insecure_client.connect()).await;
         match insecure_result {

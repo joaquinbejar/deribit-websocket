@@ -22,11 +22,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = DeribitWebSocketClient::default();
 
     tracing::info!("🚀 Starting Advanced Mass Quote Example");
-    if !client.config.has_credentials() {
-        tracing::info!("🎯 Running in demo mode - showing Advanced Mass Quote API usage");
-        demonstrate_advanced_mass_quote_api();
-        return Ok(());
-    }
 
     // Shared state for tracking quotes and MMP triggers
     let quote_count = Arc::new(Mutex::new(0u32));
@@ -108,6 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Connect and authenticate
+    let client = client;
     client.connect().await?;
     tracing::info!("✅ Connected to Deribit WebSocket");
 
@@ -321,146 +317,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("   ✅ Example completed successfully!");
 
     Ok(())
-}
-
-/// Demonstrate Advanced Mass Quote API usage without requiring real connection
-fn demonstrate_advanced_mass_quote_api() {
-    tracing::info!("📊 === Advanced Mass Quote API Demonstration ===");
-
-    // Step 1: Multiple MMP Groups
-    tracing::info!("🏷️ Step 1: Creating Multiple MMP Groups");
-
-    let mmp_groups = vec![
-        ("btc_scalping", 1.0, 0.5),
-        ("btc_swing", 5.0, 2.0),
-        ("btc_hedge", 10.0, 5.0),
-    ];
-
-    for (name, qty_limit, delta_limit) in &mmp_groups {
-        match MmpGroupConfig::new(name.to_string(), *qty_limit, *delta_limit, 1000, 5000) {
-            Ok(config) => {
-                tracing::info!(
-                    "✅ MMP Group '{}': Qty={}, Delta={}",
-                    config.mmp_group,
-                    config.quantity_limit,
-                    config.delta_limit
-                );
-            }
-            Err(e) => {
-                tracing::error!("❌ Failed to create MMP group '{}': {}", name, e);
-            }
-        }
-    }
-
-    // Step 2: Layered Quotes Strategy
-    tracing::info!("💰 Step 2: Creating Layered Quote Strategy");
-
-    let mut all_quotes = Vec::new();
-
-    // Scalping quotes (tight spreads)
-    let scalping_quotes = vec![
-        Quote::buy("BTC-PERPETUAL".to_string(), 0.1, 49900.0)
-            .with_quote_set_id("scalp_buy".to_string()),
-        Quote::sell("BTC-PERPETUAL".to_string(), 0.1, 50100.0)
-            .with_quote_set_id("scalp_sell".to_string()),
-    ];
-
-    // Swing quotes (wider spreads)
-    let swing_quotes = vec![
-        Quote::buy("BTC-PERPETUAL".to_string(), 0.5, 49000.0)
-            .with_quote_set_id("swing_buy".to_string()),
-        Quote::sell("BTC-PERPETUAL".to_string(), 0.5, 51000.0)
-            .with_quote_set_id("swing_sell".to_string()),
-    ];
-
-    // Hedge quotes (very wide spreads)
-    let hedge_quotes = vec![
-        Quote::buy("BTC-PERPETUAL".to_string(), 1.0, 47000.0)
-            .with_quote_set_id("hedge_buy".to_string()),
-        Quote::sell("BTC-PERPETUAL".to_string(), 1.0, 53000.0)
-            .with_quote_set_id("hedge_sell".to_string()),
-    ];
-
-    all_quotes.extend(scalping_quotes);
-    all_quotes.extend(swing_quotes);
-    all_quotes.extend(hedge_quotes);
-
-    for (i, quote) in all_quotes.iter().enumerate() {
-        tracing::info!(
-            "   📋 Quote {}: {} {} @ {} (Set: {})",
-            i + 1,
-            quote.side.to_uppercase(),
-            quote.amount,
-            quote.price,
-            quote.quote_set_id.as_deref().unwrap_or("none")
-        );
-    }
-
-    // Step 3: Mass Quote Requests for Each Group
-    tracing::info!("📤 Step 3: Creating Mass Quote Requests");
-
-    let groups_and_quotes = vec![
-        ("btc_scalping", &all_quotes[0..2]),
-        ("btc_swing", &all_quotes[2..4]),
-        ("btc_hedge", &all_quotes[4..6]),
-    ];
-
-    for (group_name, quotes) in groups_and_quotes {
-        let mass_quote_request = MassQuoteRequest::new(group_name.to_string(), quotes.to_vec())
-            .with_quote_id(format!("{}_batch", group_name))
-            .with_detailed_errors();
-
-        match mass_quote_request.validate() {
-            Ok(()) => {
-                tracing::info!(
-                    "✅ Mass quote request for '{}' validated ({} quotes)",
-                    group_name,
-                    quotes.len()
-                );
-            }
-            Err(e) => {
-                tracing::error!("❌ Mass quote request for '{}' failed: {}", group_name, e);
-            }
-        }
-    }
-
-    // Step 4: Risk Management Scenarios
-    tracing::info!("🚨 Step 4: Risk Management Scenarios");
-
-    tracing::info!("   📊 MMP Trigger Simulation:");
-    tracing::info!("     - Scalping group: High frequency, low delta");
-    tracing::info!("     - Swing group: Medium frequency, medium delta");
-    tracing::info!("     - Hedge group: Low frequency, high delta");
-
-    // Step 5: Quote Management
-    tracing::info!("🗑️ Step 5: Quote Management Options");
-
-    let cancel_scenarios = vec![
-        (
-            "Cancel scalping quotes",
-            CancelQuotesRequest::by_quote_set_id("scalp_buy".to_string()),
-        ),
-        (
-            "Cancel all BTC quotes",
-            CancelQuotesRequest::by_currency("BTC".to_string()),
-        ),
-        (
-            "Cancel by delta range",
-            CancelQuotesRequest::by_delta_range(0.0, 0.5),
-        ),
-    ];
-
-    for (description, request) in cancel_scenarios {
-        tracing::info!("   🎯 {}: {:?}", description, request);
-    }
-
-    // Step 6: Summary
-    tracing::info!("📈 === Advanced Demo Summary ===");
-    tracing::info!("✅ Multiple MMP Groups: Configured");
-    tracing::info!("✅ Layered Quote Strategy: Demonstrated");
-    tracing::info!("✅ Risk Management: Scenarios shown");
-    tracing::info!("✅ Quote Management: Options available");
-    tracing::info!("🎯 To run with real connection, set environment variables:");
-    tracing::info!("   export DERIBIT_CLIENT_ID=your_client_id");
-    tracing::info!("   export DERIBIT_CLIENT_SECRET=your_client_secret");
 }

@@ -96,7 +96,6 @@ impl Default for WebSocketConfig {
 }
 
 impl WebSocketConfig {
-
     /// Create a new configuration with custom URL
     pub fn with_url(url: &str) -> Result<Self, url::ParseError> {
         Ok(Self {

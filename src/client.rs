@@ -23,14 +23,20 @@ use crate::{
 /// WebSocket client for Deribit
 #[derive(Debug)]
 pub struct DeribitWebSocketClient {
+    /// WebSocket configuration
     pub config: Arc<WebSocketConfig>,
     connection: Arc<Mutex<WebSocketConnection>>,
+    /// WebSocket session
     pub session: Arc<WebSocketSession>,
     request_builder: Arc<Mutex<RequestBuilder>>,
+    #[allow(dead_code)]
     response_handler: Arc<ResponseHandler>,
+    #[allow(dead_code)]
     notification_handler: Arc<NotificationHandler>,
     subscription_manager: Arc<Mutex<SubscriptionManager>>,
+    #[allow(dead_code)]
     message_sender: Option<mpsc::UnboundedSender<String>>,
+    #[allow(dead_code)]
     message_receiver: Option<mpsc::UnboundedReceiver<String>>,
     message_handler: Option<MessageHandler>,
 }

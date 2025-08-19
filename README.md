@@ -26,6 +26,7 @@ through Deribit's WebSocket API v2.
 - 📡 **JSON-RPC Protocol** - Complete JSON-RPC 2.0 implementation for Deribit API
 - 📊 **Real-time Market Data** - Live ticker, order book, trades, and chart data streaming
 - 📈 **Advanced Subscriptions** - Chart data aggregation and user position change notifications
+- 💰 **Mass Quote System** - High-performance mass quoting with MMP (Market Maker Protection) groups
 - 🔐 **Authentication** - Secure API key and signature-based authentication
 - 🛡️ **Error Handling** - Comprehensive error types with detailed recovery mechanisms
 - ⚡ **Async/Await** - Full async support with tokio runtime for high concurrency
@@ -71,8 +72,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|_| "Failed to install crypto provider")?;
 
     // Create client for testnet
-    let config = WebSocketConfig::testnet();
-    let mut client = DeribitWebSocketClient::new(config)?;
+    let config = WebSocketConfig::default();
+    let mut client = DeribitWebSocketClient::new(&config)?;
 
     // Set up message processing
     client.set_message_handler(
@@ -112,12 +113,36 @@ client.authenticate("client_id", "client_secret").await?;
 client.subscribe(vec!["user.changes.BTC-PERPETUAL.raw".to_string()]).await?;
 ```
 
+#### Mass Quote System
+```rust
+// Set up MMP group for mass quoting
+let mmp_config = MmpGroupConfig::new(
+    "btc_market_making".to_string(),
+    10.0,  // quantity_limit
+    5.0,   // delta_limit
+    1000,  // interval (ms)
+    5000,  // frozen_time (ms)
+)?;
+client.set_mmp_config(mmp_config).await?;
+
+// Create and place mass quotes
+let quotes = vec![
+    Quote::buy("BTC-PERPETUAL".to_string(), 0.1, 45000.0),
+    Quote::sell("BTC-PERPETUAL".to_string(), 0.1, 55000.0),
+];
+let request = MassQuoteRequest::new("btc_market_making".to_string(), quotes);
+let response = client.mass_quote(request).await?;
+```
+
 ### Examples
 
 The crate includes comprehensive examples demonstrating:
 - **`basic_client.rs`** - Basic connection, subscription, and message handling
 - **`callback_example.rs`** - Advanced callback system with error handling
 - **`advanced_subscriptions.rs`** - Chart data and position change subscriptions
+- **`mass_quote_basic.rs`** - Basic mass quoting with MMP group setup
+- **`mass_quote_advanced.rs`** - Advanced mass quoting with multiple MMP groups and monitoring
+- **`mass_quote_options.rs`** - Options-specific mass quoting with delta management
 
 ### Architecture
 

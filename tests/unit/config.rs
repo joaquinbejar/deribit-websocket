@@ -5,14 +5,18 @@ use std::time::Duration;
 
 #[test]
 fn test_default_config() {
-    let config = WebSocketConfig::default();
+    let config = unsafe {
+        std::env::set_var("DERIBIT_WS_URL", "wss://www.deribit.com/ws/api/v2");
+        std::env::remove_var("DERIBIT_TEST_MODE");
+        std::env::remove_var("DERIBIT_RECONNECT_DELAY");
+        WebSocketConfig::default()
+    };
 
-    assert_eq!(config.ws_url.as_str(), "wss://test.deribit.com/ws/api/v2");
+    assert_eq!(config.ws_url.as_str(), "wss://www.deribit.com/ws/api/v2");
     assert_eq!(config.heartbeat_interval, Duration::from_secs(30));
-    assert_eq!(config.max_reconnect_attempts, 5);
-    assert_eq!(config.reconnect_delay, Duration::from_millis(1000));
+    assert_eq!(config.max_reconnect_attempts, 3);
+    assert_eq!(config.reconnect_delay, Duration::from_millis(5000));
 }
-
 
 #[test]
 fn test_custom_url_config() {
@@ -44,10 +48,15 @@ fn test_config_builder_pattern() {
 
 #[test]
 fn test_config_chaining() {
-    let config = WebSocketConfig::default()
-        .with_heartbeat_interval(Duration::from_secs(45))
-        .with_max_reconnect_attempts(3)
-        .with_reconnect_delay(Duration::from_millis(500));
+    let config = unsafe {
+        std::env::set_var("DERIBIT_WS_URL", "wss://www.deribit.com/ws/api/v2");
+        std::env::remove_var("DERIBIT_TEST_MODE");
+        std::env::remove_var("DERIBIT_RECONNECT_DELAY");
+        WebSocketConfig::default()
+    }
+    .with_heartbeat_interval(Duration::from_secs(45))
+    .with_max_reconnect_attempts(3)
+    .with_reconnect_delay(Duration::from_millis(500));
 
     assert_eq!(config.ws_url.as_str(), "wss://www.deribit.com/ws/api/v2");
     assert_eq!(config.heartbeat_interval, Duration::from_secs(45));

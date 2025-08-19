@@ -16,7 +16,7 @@ use deribit_websocket::prelude::*;
 
 /// Check if .env file exists and contains required variables
 fn check_env_file() -> Result<(), Box<dyn std::error::Error>> {
-    if !Path::new(".env").exists() {
+    if !Path::new("../../../.env.backup").exists() {
         return Err(
             "Missing .env file. Please create one with DERIBIT_CLIENT_ID and DERIBIT_CLIENT_SECRET"
                 .into(),
@@ -57,7 +57,7 @@ async fn test_manual_reconnection() -> Result<(), Box<dyn std::error::Error>> {
     let ws_url = std::env::var("DERIBIT_WS_URL")
         .unwrap_or_else(|_| "wss://test.deribit.com/ws/api/v2".to_string());
     let config = deribit_websocket::config::WebSocketConfig::with_url(&ws_url)?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
 
     // Step 1: Initial connection
     info!("🔌 Establishing initial connection...");
@@ -129,7 +129,7 @@ async fn test_connection_state_management() -> Result<(), Box<dyn std::error::Er
     let ws_url = std::env::var("DERIBIT_WS_URL")
         .unwrap_or_else(|_| "wss://test.deribit.com/ws/api/v2".to_string());
     let config = deribit_websocket::config::WebSocketConfig::with_url(&ws_url)?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
 
     // Initial connection
     info!("🔌 Establishing connection...");

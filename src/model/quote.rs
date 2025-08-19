@@ -463,7 +463,7 @@ mod tests {
     fn test_mass_quote_validation_duplicate_quotes() {
         let quotes = vec![
             Quote::buy("BTC-PERPETUAL".to_string(), 1.0, 50000.0),
-            Quote::buy("BTC-PERPETUAL".to_string(), 2.0, 49000.0),
+            Quote::buy("BTC-PERPETUAL".to_string(), 2.0, 50000.0), // Same price to trigger duplicate detection
         ];
 
         let request = MassQuoteRequest::new("btc_group".to_string(), quotes);

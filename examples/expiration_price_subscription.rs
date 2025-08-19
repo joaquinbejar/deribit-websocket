@@ -3,7 +3,6 @@
 //! This example demonstrates how to subscribe to estimated expiration price updates
 //! for options and futures instruments.
 
-use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use std::sync::{Arc, Mutex};
 

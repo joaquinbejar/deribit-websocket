@@ -16,7 +16,7 @@ use deribit_websocket::prelude::*;
 /// Check if .env file exists and contains required variables
 fn check_env_file() -> Result<(), Box<dyn std::error::Error>> {
     // Check if .env file exists
-    if !Path::new(".env").exists() {
+    if !Path::new("../../../.env.backup").exists() {
         return Err(
             "Missing .env file. Please create one with DERIBIT_CLIENT_ID and DERIBIT_CLIENT_SECRET"
                 .into(),
@@ -68,7 +68,7 @@ async fn test_oauth_authentication_flow() -> Result<(), Box<dyn std::error::Erro
 
     // Step 2: Create configuration and client
     let config = deribit_websocket::config::WebSocketConfig::with_url(&ws_url)?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
     info!("✅ WebSocket client created");
 
     // Step 3: Establish WebSocket connection
@@ -150,7 +150,7 @@ async fn test_invalid_credentials() -> Result<(), Box<dyn std::error::Error>> {
     let ws_url = std::env::var("DERIBIT_WS_URL")
         .unwrap_or_else(|_| "wss://test.deribit.com/ws/api/v2".to_string());
     let config = deribit_websocket::config::WebSocketConfig::with_url(&ws_url)?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
 
     // Connect first
     client.connect().await?;
@@ -196,7 +196,7 @@ async fn test_authentication_state_management() -> Result<(), Box<dyn std::error
         .unwrap_or_else(|_| "wss://test.deribit.com/ws/api/v2".to_string());
 
     let config = deribit_websocket::config::WebSocketConfig::with_url(&ws_url)?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
 
     // Try to authenticate without connecting first
     info!("🔐 Attempting authentication without connection...");

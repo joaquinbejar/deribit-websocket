@@ -21,18 +21,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("🚀 Starting Mass Quote Options Example");
 
-    // Check if running in demo mode
-    tracing::info!("📋 This is a demonstration of Options Mass Quote functionality");
-    tracing::info!(
-        "⚠️  Set DERIBIT_CLIENT_ID and DERIBIT_CLIENT_SECRET to run with real connection"
-    );
-
-    if !client.config.has_credentials() {
-        tracing::info!("🎯 Running in demo mode - showing Options Mass Quote API usage");
-        demonstrate_options_mass_quote_api();
-        return Ok(());
-    }
-
     // Shared state for tracking option data
     let quote_count = Arc::new(Mutex::new(0u32));
     let quote_count_clone = Arc::clone(&quote_count);
@@ -109,6 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Connect and authenticate
+    let client = client;
     client.connect().await?;
     tracing::info!("✅ Connected to Deribit WebSocket");
 
@@ -329,168 +318,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("🎯 Mass Quote Options Example completed successfully!");
 
     Ok(())
-}
-
-/// Demonstrate Options Mass Quote API usage without requiring real connection
-fn demonstrate_options_mass_quote_api() {
-    tracing::info!("📊 === Options Mass Quote API Demonstration ===");
-
-    // Step 1: Options MMP Group Configuration
-    tracing::info!("🏷️ Step 1: Creating Options MMP Group");
-
-    let _options_mmp_config = match MmpGroupConfig::new(
-        "btc_options_mm".to_string(),
-        50.0,  // Higher quantity limit for options
-        10.0,  // Delta limit for options portfolio
-        2000,  // 2 second interval
-        10000, // 10 second frozen time
-    ) {
-        Ok(config) => {
-            tracing::info!(
-                "✅ Options MMP Group '{}': Qty={}, Delta={}",
-                config.mmp_group,
-                config.quantity_limit,
-                config.delta_limit
-            );
-            config
-        }
-        Err(e) => {
-            tracing::error!("❌ Failed to create options MMP config: {}", e);
-            return;
-        }
-    };
-
-    // Step 2: Options Chain Analysis
-    tracing::info!("📈 Step 2: Options Chain Strategy");
-
-    // Simulate options instruments (normally would be fetched from API)
-    let btc_options = vec![
-        "BTC-29MAR24-50000-C", // Call options
-        "BTC-29MAR24-55000-C",
-        "BTC-29MAR24-45000-P", // Put options
-        "BTC-29MAR24-50000-P",
-    ];
-
-    tracing::info!("   📋 Target Options Instruments:");
-    for option in &btc_options {
-        tracing::info!("     🎯 {}", option);
-    }
-
-    // Step 3: Delta-Neutral Quote Strategy
-    tracing::info!("⚖️ Step 3: Creating Delta-Neutral Quote Strategy");
-
-    let mut option_quotes = Vec::new();
-
-    // Call options quotes (negative delta when selling)
-    option_quotes.push(
-        Quote::sell("BTC-29MAR24-50000-C".to_string(), 10.0, 2500.0)
-            .with_quote_set_id("call_spread".to_string())
-            .with_post_only(true),
-    );
-    option_quotes.push(
-        Quote::sell("BTC-29MAR24-55000-C".to_string(), 15.0, 1200.0)
-            .with_quote_set_id("call_spread".to_string())
-            .with_post_only(true),
-    );
-
-    // Put options quotes (positive delta when selling)
-    option_quotes.push(
-        Quote::sell("BTC-29MAR24-45000-P".to_string(), 12.0, 1800.0)
-            .with_quote_set_id("put_spread".to_string())
-            .with_post_only(true),
-    );
-    option_quotes.push(
-        Quote::sell("BTC-29MAR24-50000-P".to_string(), 8.0, 2200.0)
-            .with_quote_set_id("put_spread".to_string())
-            .with_post_only(true),
-    );
-
-    for (i, quote) in option_quotes.iter().enumerate() {
-        tracing::info!(
-            "   📋 Quote {}: {} {} @ {} (Set: {})",
-            i + 1,
-            quote.side.to_uppercase(),
-            quote.amount,
-            quote.price,
-            quote.quote_set_id.as_deref().unwrap_or("none")
-        );
-    }
-
-    // Step 4: Mass Quote Request with Delta Management
-    tracing::info!("📤 Step 4: Creating Options Mass Quote Request");
-
-    let options_mass_quote = MassQuoteRequest::new("btc_options_mm".to_string(), option_quotes)
-        .with_quote_id("options_batch_1".to_string())
-        .with_detailed_errors();
-
-    match options_mass_quote.validate() {
-        Ok(()) => {
-            tracing::info!("✅ Options mass quote request validated");
-            tracing::info!("   🏷️ MMP Group: {}", options_mass_quote.mmp_group);
-            tracing::info!("   📊 Quote Count: {}", options_mass_quote.quotes.len());
-            tracing::info!(
-                "   🆔 Quote ID: {}",
-                options_mass_quote.quote_id.as_deref().unwrap_or("none")
-            );
-        }
-        Err(e) => {
-            tracing::error!("❌ Options mass quote validation failed: {}", e);
-            return;
-        }
-    }
-
-    // Step 5: Greeks Monitoring Simulation
-    tracing::info!("📊 Step 5: Greeks Monitoring Strategy");
-
-    tracing::info!("   📈 Portfolio Greeks Targets:");
-    tracing::info!("     Δ (Delta): Target ±2.0 BTC");
-    tracing::info!("     Γ (Gamma): Monitor for large moves");
-    tracing::info!("     Θ (Theta): Positive time decay");
-    tracing::info!("     ν (Vega): Volatility exposure limits");
-
-    // Step 6: Risk Management for Options
-    tracing::info!("🚨 Step 6: Options Risk Management");
-
-    tracing::info!("   ⚠️ Risk Scenarios:");
-    tracing::info!("     - Delta breach: Cancel quotes outside ±10 delta");
-    tracing::info!("     - Volatility spike: Reduce vega exposure");
-    tracing::info!("     - Time decay: Adjust theta-positive positions");
-    tracing::info!("     - Gamma risk: Monitor large price moves");
-
-    // Step 7: Quote Cancellation Strategies
-    tracing::info!("🗑️ Step 7: Options Quote Management");
-
-    let cancel_strategies = vec![
-        (
-            "Cancel call spread",
-            CancelQuotesRequest::by_quote_set_id("call_spread".to_string()),
-        ),
-        (
-            "Cancel put spread",
-            CancelQuotesRequest::by_quote_set_id("put_spread".to_string()),
-        ),
-        (
-            "Cancel by delta range",
-            CancelQuotesRequest::by_delta_range(-5.0, 5.0),
-        ),
-        (
-            "Cancel all BTC options",
-            CancelQuotesRequest::by_currency("BTC".to_string()),
-        ),
-    ];
-
-    for (description, request) in cancel_strategies {
-        tracing::info!("   🎯 {}: {:?}", description, request);
-    }
-
-    // Step 8: Summary
-    tracing::info!("📈 === Options Demo Summary ===");
-    tracing::info!("✅ Options MMP Group: Configured for higher limits");
-    tracing::info!("✅ Delta-Neutral Strategy: Call/Put spreads created");
-    tracing::info!("✅ Greeks Monitoring: Risk parameters defined");
-    tracing::info!("✅ Options Risk Management: Scenarios covered");
-    tracing::info!("✅ Quote Management: Delta-based cancellation available");
-    tracing::info!("🎯 To run with real connection, set environment variables:");
-    tracing::info!("   export DERIBIT_CLIENT_ID=your_client_id");
-    tracing::info!("   export DERIBIT_CLIENT_SECRET=your_client_secret");
 }

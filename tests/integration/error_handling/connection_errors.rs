@@ -17,7 +17,7 @@ use deribit_websocket::prelude::*;
 
 /// Check if .env file exists and contains required variables
 fn check_env_file() -> Result<(), Box<dyn std::error::Error>> {
-    if !Path::new(".env").exists() {
+    if !Path::new("../../../.env.backup").exists() {
         return Err(
             "Missing .env file. Please create one with DERIBIT_CLIENT_ID and DERIBIT_CLIENT_SECRET"
                 .into(),
@@ -58,7 +58,7 @@ async fn test_connection_to_invalid_host() -> Result<(), Box<dyn std::error::Err
     // Try to connect to non-existent host
     let config =
         deribit_websocket::config::WebSocketConfig::with_url("wss://nonexistent.invalid.com/ws")?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
 
     info!("🔌 Attempting connection to invalid host...");
     let connect_result = timeout(Duration::from_secs(5), client.connect()).await;
@@ -92,7 +92,7 @@ async fn test_connection_to_invalid_path() -> Result<(), Box<dyn std::error::Err
 
     // Try to connect to unreachable IP
     let config = deribit_websocket::config::WebSocketConfig::with_url("wss://10.255.255.1:443/ws")?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
 
     info!("🔌 Attempting connection to unreachable IP...");
     let connect_result = timeout(Duration::from_secs(5), client.connect()).await;
@@ -128,7 +128,7 @@ async fn test_invalid_websocket_path() -> Result<(), Box<dyn std::error::Error>>
     let config = deribit_websocket::config::WebSocketConfig::with_url(
         "wss://test.deribit.com/invalid/path",
     )?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
 
     info!("🔌 Attempting connection to invalid path...");
     let connect_result = timeout(Duration::from_secs(10), client.connect()).await;
@@ -176,13 +176,13 @@ async fn test_error_recovery_after_failure() -> Result<(), Box<dyn std::error::E
     let ws_url = std::env::var("DERIBIT_WS_URL")
         .unwrap_or_else(|_| "wss://test.deribit.com/ws/api/v2".to_string());
     let config = deribit_websocket::config::WebSocketConfig::with_url(&ws_url)?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
 
     // First, try to connect to invalid host (should fail)
     info!("🔌 First attempt: connecting to invalid host...");
     let invalid_config =
         deribit_websocket::config::WebSocketConfig::with_url("wss://invalid.example.com/ws")?;
-    let invalid_client = DeribitWebSocketClient::new(invalid_config)?;
+    let invalid_client = DeribitWebSocketClient::new(&invalid_config)?;
 
     let first_result = timeout(Duration::from_secs(3), invalid_client.connect()).await;
     match first_result {

@@ -4,7 +4,6 @@
 //! 1. Primary callback processes each message and returns Result<(), Error>
 //! 2. Error callback handles failures from the primary callback
 
-use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
@@ -144,5 +143,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("🎉 Callback example completed successfully!");
     Ok(())
 }
-
-

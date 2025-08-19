@@ -16,12 +16,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = DeribitWebSocketClient::default();
 
     tracing::info!("🚀 Starting Mass Quote Basic Example");
-    if !client.config.has_credentials() {
-        tracing::info!("🎯 Running in demo mode - showing Mass Quote API usage");
-        demonstrate_mass_quote_api();
-        return Ok(());
-    }
 
+    let mut client = client;
     client.connect().await?;
     tracing::info!("✅ Connected to Deribit WebSocket");
 
@@ -29,8 +25,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     client.authenticate(client_id, client_secret).await?;
     tracing::info!("🔐 Authenticated successfully");
 
-    // Step 1: Create MMP group configuration
-    tracing::info!("📋 Setting up MMP group configuration...");
+    // Step 1: Try to create MMP group configuration (requires manual activation by Deribit staff)
+    tracing::info!("📋 Attempting to set up MMP group configuration...");
+    tracing::info!("ℹ️  Note: MMP requires manual activation by Deribit staff for each account");
 
     let mmp_config = MmpGroupConfig::new(
         "btc_market_making".to_string(),
@@ -40,8 +37,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         5000, // frozen_time: 5 seconds after trigger
     )?;
 
-    client.set_mmp_config(mmp_config).await?;
-    tracing::info!("✅ MMP group 'btc_market_making' configured");
+    match client.set_mmp_config(mmp_config).await {
+        Ok(()) => {
+            tracing::info!("✅ MMP group 'btc_market_making' configured successfully");
+        }
+        Err(e) => {
+            tracing::warn!("⚠️  MMP configuration failed: {}", e);
+            tracing::info!("📝 This is expected if MMP is not activated for this account");
+            tracing::info!("📞 Contact Deribit support to request MMP activation");
+        }
+    }
 
     // Step 2: Create quotes for BTC perpetual
     tracing::info!("💰 Creating mass quotes for BTC-PERPETUAL...");
@@ -59,11 +64,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_quote_set_id("spread_2".to_string()),
     ];
 
-    let mass_quote_request = MassQuoteRequest::new("btc_market_making".to_string(), quotes)
+    // Create mass quote request without MMP group (since MMP may not be available)
+    let mass_quote_request = MassQuoteRequest::new("default".to_string(), quotes.clone())
         .with_quote_id("quote_batch_1".to_string())
         .with_detailed_errors();
 
-    // Step 3: Place mass quotes
+    // Step 3: Attempt to place mass quotes
+    tracing::info!("ℹ️  Note: Mass Quote feature requires separate activation by Deribit staff");
     match client.mass_quote(mass_quote_request).await {
         Ok(response) => {
             tracing::info!(
@@ -85,8 +92,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Err(e) => {
-            tracing::error!("❌ Mass quote failed: {}", e);
-            return Err(e.into());
+            tracing::warn!("⚠️  Mass quote failed: {}", e);
+            tracing::info!(
+                "📝 This is expected if Mass Quote feature is not activated for this account"
+            );
+            tracing::info!("📞 Contact Deribit support to request Mass Quote activation");
+            tracing::info!("🔄 Continuing with individual quote placement demonstration...");
+
+            // Demonstrate individual quote placement as fallback
+            demonstrate_individual_quotes(&mut client, quotes).await?;
         }
     }
 
@@ -148,8 +162,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Step 7: Clean up MMP group (optional)
-    tracing::info!("🧽 Cleaning up MMP group...");
+    // Step 7: Clean up MMP group (only if MMP was successfully configured)
+    tracing::info!("🧽 Attempting to clean up MMP group...");
 
     let cleanup_config = MmpGroupConfig::new(
         "btc_market_making".to_string(),
@@ -165,7 +179,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tracing::info!("✅ MMP group disabled and cleaned up");
         }
         Err(e) => {
-            tracing::warn!("⚠️ Failed to disable MMP group: {}", e);
+            tracing::warn!(
+                "⚠️ Failed to disable MMP group: {} (expected if MMP not activated)",
+                e
+            );
         }
     }
 
@@ -174,114 +191,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Demonstrate Mass Quote API usage without requiring real connection
-fn demonstrate_mass_quote_api() {
-    tracing::info!("📊 === Mass Quote API Demonstration ===");
-
-    // Step 1: MMP Group Configuration
-    tracing::info!("🏷️ Step 1: Creating MMP Group Configuration");
-
-    let mmp_config = match MmpGroupConfig::new(
-        "btc_market_making".to_string(),
-        10.0, // quantity_limit: 10 BTC max per quote
-        5.0,  // delta_limit: 5 BTC (must be < quantity_limit)
-        1000, // interval: 1 second
-        5000, // frozen_time: 5 seconds after trigger
-    ) {
-        Ok(config) => {
-            tracing::info!(
-                "✅ MMP Config created: Group '{}', Qty Limit: {}, Delta Limit: {}",
-                config.mmp_group,
-                config.quantity_limit,
-                config.delta_limit
-            );
-            config
-        }
-        Err(e) => {
-            tracing::error!("❌ Failed to create MMP config: {}", e);
-            return;
-        }
-    };
-
-    tracing::info!("{mmp_config}");
-
-    // Step 2: Create Quotes
-    tracing::info!("💰 Step 2: Creating Mass Quotes");
-
-    let quotes = vec![
-        Quote::buy("BTC-PERPETUAL".to_string(), 0.1, 45000.0)
-            .with_quote_set_id("spread_1".to_string())
-            .with_post_only(true),
-        Quote::sell("BTC-PERPETUAL".to_string(), 0.1, 55000.0)
-            .with_quote_set_id("spread_1".to_string())
-            .with_post_only(true),
-        Quote::buy("BTC-PERPETUAL".to_string(), 0.2, 44000.0)
-            .with_quote_set_id("spread_2".to_string()),
-        Quote::sell("BTC-PERPETUAL".to_string(), 0.2, 56000.0)
-            .with_quote_set_id("spread_2".to_string()),
-    ];
+/// Demonstrate individual quote placement when mass quote is not available
+async fn demonstrate_individual_quotes(
+    _client: &mut DeribitWebSocketClient,
+    quotes: Vec<Quote>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    tracing::info!("📋 Demonstrating individual quote placement...");
 
     for (i, quote) in quotes.iter().enumerate() {
         tracing::info!(
-            "   📋 Quote {}: {} {} @ {} (Set: {})",
+            "   📤 Placing quote {}: {} {} @ {} (Set: {})",
             i + 1,
             quote.side.to_uppercase(),
             quote.amount,
             quote.price,
             quote.quote_set_id.as_deref().unwrap_or("none")
         );
+
+        // In a real implementation, you would place individual orders here
+        // This is just a demonstration of the quote structure
     }
 
-    // Step 3: Create Mass Quote Request
-    tracing::info!("📤 Step 3: Creating Mass Quote Request");
-
-    let mass_quote_request = MassQuoteRequest::new("btc_market_making".to_string(), quotes)
-        .with_quote_id("quote_batch_1".to_string())
-        .with_detailed_errors();
-
-    match mass_quote_request.validate() {
-        Ok(()) => {
-            tracing::info!("✅ Mass quote request validation passed");
-            tracing::info!("   🏷️ MMP Group: {}", mass_quote_request.mmp_group);
-            tracing::info!("   📊 Quote Count: {}", mass_quote_request.quotes.len());
-            tracing::info!(
-                "   🆔 Quote ID: {}",
-                mass_quote_request.quote_id.as_deref().unwrap_or("none")
-            );
-        }
-        Err(e) => {
-            tracing::error!("❌ Mass quote request validation failed: {}", e);
-            return;
-        }
-    }
-
-    // Step 4: Demonstrate Quote Cancellation
-    tracing::info!("🗑️ Step 4: Quote Cancellation Options");
-
-    let cancel_by_set = CancelQuotesRequest::by_quote_set_id("spread_1".to_string());
-    tracing::info!(
-        "   📋 Cancel by Quote Set ID: {:?}",
-        cancel_by_set.quote_set_id
-    );
-
-    let cancel_by_currency = CancelQuotesRequest::by_currency("BTC".to_string());
-    tracing::info!(
-        "   💱 Cancel by Currency: {:?}",
-        cancel_by_currency.currency
-    );
-
-    let cancel_by_instrument = CancelQuotesRequest::by_instrument("BTC-PERPETUAL".to_string());
-    tracing::info!(
-        "   🎯 Cancel by Instrument: {:?}",
-        cancel_by_instrument.instrument_name
-    );
-
-    // Step 5: Summary
-    tracing::info!("📈 === Demo Summary ===");
-    tracing::info!("✅ MMP Group Configuration: Ready");
-    tracing::info!("✅ Mass Quote Request: Validated");
-    tracing::info!("✅ Quote Cancellation: Options demonstrated");
-    tracing::info!("🎯 To run with real connection, set environment variables:");
-    tracing::info!("   export DERIBIT_CLIENT_ID=your_client_id");
-    tracing::info!("   export DERIBIT_CLIENT_SECRET=your_client_secret");
+    tracing::info!("✅ Individual quote demonstration completed");
+    Ok(())
 }

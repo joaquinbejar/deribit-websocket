@@ -24,7 +24,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("🚀 Starting User Trades Subscription Example");
 
-    
     // Statistics tracking
     let trade_count = Arc::new(Mutex::new(0u32));
     let total_pnl = Arc::new(Mutex::new(0.0f64));
@@ -108,7 +107,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Authenticate
     tracing::info!("🔐 Authenticating...");
-    match client.authenticate(&config.client_id.unwrap(), &config.client_secret.unwrap()).await {
+    match client
+        .authenticate(&config.client_id.unwrap(), &config.client_secret.unwrap())
+        .await
+    {
         Ok(_) => tracing::info!("✅ Authentication successful"),
         Err(e) => {
             tracing::info!("❌ Authentication failed: {}", e);

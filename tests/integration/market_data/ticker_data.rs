@@ -17,7 +17,7 @@ use deribit_websocket::prelude::*;
 
 /// Check if .env file exists and contains required variables
 fn check_env_file() -> Result<(), Box<dyn std::error::Error>> {
-    if !Path::new(".env").exists() {
+    if !Path::new("../../../.env.backup").exists() {
         return Err(
             "Missing .env file. Please create one with DERIBIT_CLIENT_ID and DERIBIT_CLIENT_SECRET"
                 .into(),
@@ -58,7 +58,7 @@ async fn test_ticker_data_structure() -> Result<(), Box<dyn std::error::Error>> 
     let ws_url = std::env::var("DERIBIT_WS_URL")
         .unwrap_or_else(|_| "wss://test.deribit.com/ws/api/v2".to_string());
     let config = deribit_websocket::config::WebSocketConfig::with_url(&ws_url)?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
 
     // Connect and subscribe
     client.connect().await?;
@@ -192,7 +192,7 @@ async fn test_multiple_ticker_subscriptions() -> Result<(), Box<dyn std::error::
     let ws_url = std::env::var("DERIBIT_WS_URL")
         .unwrap_or_else(|_| "wss://test.deribit.com/ws/api/v2".to_string());
     let config = deribit_websocket::config::WebSocketConfig::with_url(&ws_url)?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
 
     // Connect
     client.connect().await?;

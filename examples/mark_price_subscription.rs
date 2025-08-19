@@ -3,7 +3,6 @@
 //! This example demonstrates how to subscribe to mark price updates
 //! for options instruments.
 
-use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use std::sync::{Arc, Mutex};
 

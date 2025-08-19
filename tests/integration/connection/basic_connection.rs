@@ -18,7 +18,7 @@ use deribit_websocket::prelude::*;
 /// Check if .env file exists and contains required variables
 fn check_env_file() -> Result<(), Box<dyn std::error::Error>> {
     // Check if .env file exists
-    if !Path::new(".env").exists() {
+    if !Path::new("../../../.env.backup").exists() {
         return Err(
             "Missing .env file. Please create one with DERIBIT_CLIENT_ID and DERIBIT_CLIENT_SECRET"
                 .into(),
@@ -67,7 +67,7 @@ async fn test_basic_websocket_connection() -> Result<(), Box<dyn std::error::Err
     info!("✅ Configuration loaded: {}", ws_url);
 
     // Step 2: Create client
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
     info!("✅ WebSocket client created successfully");
 
     // Step 3: Establish WebSocket connection
@@ -117,7 +117,7 @@ async fn test_connection_to_invalid_host() -> Result<(), Box<dyn std::error::Err
     // Create config with invalid URL
     let config =
         deribit_websocket::config::WebSocketConfig::with_url("wss://invalid.example.com/ws")?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
 
     // Attempt to connect - this should fail
     let connect_result = timeout(Duration::from_secs(5), client.connect()).await;
@@ -149,7 +149,7 @@ async fn test_connection_timeout() -> Result<(), Box<dyn std::error::Error>> {
 
     // Use a non-responsive URL (blackhole)
     let config = deribit_websocket::config::WebSocketConfig::with_url("wss://10.255.255.1/ws")?;
-    let client = DeribitWebSocketClient::new(config)?;
+    let client = DeribitWebSocketClient::new(&config)?;
 
     // Attempt to connect with short timeout
     let connect_result = timeout(Duration::from_secs(2), client.connect()).await;
@@ -184,8 +184,8 @@ async fn test_multiple_concurrent_connections() -> Result<(), Box<dyn std::error
     let config = deribit_websocket::config::WebSocketConfig::with_url(&ws_url)?;
 
     // Create multiple clients
-    let client1 = DeribitWebSocketClient::new(config.clone())?;
-    let client2 = DeribitWebSocketClient::new(config)?;
+    let client1 = DeribitWebSocketClient::new(&config.clone())?;
+    let client2 = DeribitWebSocketClient::new(&config)?;
 
     info!("🔌 Connecting first client...");
     client1.connect().await?;
