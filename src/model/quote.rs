@@ -1,10 +1,11 @@
 //! Quote and Mass Quote model definitions for Deribit WebSocket API
 
-use deribit_base::{impl_json_debug_pretty, impl_json_display};
+use pretty_simple_display::{DebugPretty, DisplaySimple};
+
 use serde::{Deserialize, Serialize};
 
 /// Represents a single quote in a mass quote request
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, DebugPretty, DisplaySimple)]
 pub struct Quote {
     /// Instrument name (e.g., "BTC-PERPETUAL")
     pub instrument_name: String,
@@ -25,11 +26,9 @@ pub struct Quote {
     pub time_in_force: Option<String>,
 }
 
-impl_json_display!(Quote);
-impl_json_debug_pretty!(Quote);
 
 /// Mass quote request parameters
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, DebugPretty, DisplaySimple)]
 pub struct MassQuoteRequest {
     /// MMP group name for this mass quote
     pub mmp_group: String,
@@ -43,11 +42,9 @@ pub struct MassQuoteRequest {
     pub detailed: Option<bool>,
 }
 
-impl_json_display!(MassQuoteRequest);
-impl_json_debug_pretty!(MassQuoteRequest);
 
 /// Mass quote response
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, DebugPretty, DisplaySimple)]
 pub struct MassQuoteResult {
     /// Number of successful quotes placed
     pub success_count: u32,
@@ -58,11 +55,9 @@ pub struct MassQuoteResult {
     pub errors: Option<Vec<QuoteError>>,
 }
 
-impl_json_display!(MassQuoteResult);
-impl_json_debug_pretty!(MassQuoteResult);
 
 /// Quote error information
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, DebugPretty, DisplaySimple)]
 pub struct QuoteError {
     /// Instrument name that failed
     pub instrument_name: String,
@@ -74,11 +69,9 @@ pub struct QuoteError {
     pub error_message: String,
 }
 
-impl_json_display!(QuoteError);
-impl_json_debug_pretty!(QuoteError);
 
 /// Quote cancellation request parameters
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, DebugPretty, DisplaySimple)]
 pub struct CancelQuotesRequest {
     /// Optional currency to filter cancellations (e.g., "BTC")
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -97,21 +90,17 @@ pub struct CancelQuotesRequest {
     pub delta_range: Option<(f64, f64)>,
 }
 
-impl_json_display!(CancelQuotesRequest);
-impl_json_debug_pretty!(CancelQuotesRequest);
 
 /// Quote cancellation response
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, DebugPretty, DisplaySimple)]
 pub struct CancelQuotesResponse {
     /// Number of quotes cancelled
     pub cancelled_count: u32,
 }
 
-impl_json_display!(CancelQuotesResponse);
-impl_json_debug_pretty!(CancelQuotesResponse);
 
 /// MMP (Market Maker Protection) group configuration
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, DebugPretty, DisplaySimple)]
 pub struct MmpGroupConfig {
     /// MMP group name (unique across account)
     pub mmp_group: String,
@@ -127,11 +116,9 @@ pub struct MmpGroupConfig {
     pub enabled: bool,
 }
 
-impl_json_display!(MmpGroupConfig);
-impl_json_debug_pretty!(MmpGroupConfig);
 
 /// MMP group status information
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, DebugPretty, DisplaySimple)]
 pub struct MmpGroupStatus {
     /// MMP group name
     pub mmp_group: String,
@@ -148,11 +135,8 @@ pub struct MmpGroupStatus {
     pub freeze_end_time: Option<u64>,
 }
 
-impl_json_display!(MmpGroupStatus);
-impl_json_debug_pretty!(MmpGroupStatus);
-
 /// Quote information from get_open_orders
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, DebugPretty, DisplaySimple)]
 pub struct QuoteInfo {
     /// Quote ID
     pub quote_id: String,
@@ -182,11 +166,8 @@ pub struct QuoteInfo {
     pub priority: u64,
 }
 
-impl_json_display!(QuoteInfo);
-impl_json_debug_pretty!(QuoteInfo);
-
 /// MMP trigger notification
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, DebugPretty, DisplaySimple)]
 pub struct MmpTrigger {
     /// Currency that triggered MMP
     pub currency: String,
@@ -200,9 +181,6 @@ pub struct MmpTrigger {
     /// Duration of freeze in milliseconds
     pub frozen_time: u64,
 }
-
-impl_json_display!(MmpTrigger);
-impl_json_debug_pretty!(MmpTrigger);
 
 impl Quote {
     /// Create a new buy quote

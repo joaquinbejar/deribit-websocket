@@ -1,6 +1,6 @@
 [package]
 name = "deribit-websocket"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 authors = ["Joaquin Bejar <jb@taunais.com>"]
 description = "WebSocket client for Deribit trading platform real-time data"
@@ -33,6 +33,7 @@ dotenv = { workspace = true }
 [dev-dependencies]
 serial_test = "3.1"
 dotenv = "0.15"
+pretty-simple-display = "0.1.0"
 
 [workspace.dependencies]
 deribit-base = "0.2"
