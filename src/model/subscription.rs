@@ -1,6 +1,7 @@
 //! Subscription management for WebSocket client
 
-use deribit_base::impl_json_display;
+use pretty_simple_display::{DebugPretty, DisplaySimple};
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -8,7 +9,7 @@ use std::collections::HashMap;
 use crate::model::SubscriptionChannel;
 
 /// Subscription information
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, DebugPretty, DisplaySimple)]
 pub struct Subscription {
     /// Channel name
     pub channel: String,
@@ -120,15 +121,15 @@ impl SubscriptionManager {
 }
 
 // Custom Debug implementation for Subscription
-impl std::fmt::Debug for Subscription {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Subscription")
-            .field("channel", &self.channel)
-            .field("channel_type", &self.channel_type)
-            .field("instrument", &self.instrument)
-            .field("active", &self.active)
-            .finish()
-    }
-}
+// impl std::fmt::Debug for Subscription {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         f.debug_struct("Subscription")
+//             .field("channel", &self.channel)
+//             .field("channel_type", &self.channel_type)
+//             .field("instrument", &self.instrument)
+//             .field("active", &self.active)
+//             .finish()
+//     }
+// }
 
-impl_json_display!(Subscription);
+

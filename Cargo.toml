@@ -28,12 +28,12 @@ thiserror = { workspace = true }
 url = { workspace = true }
 futures-util = { workspace = true }
 dotenv = { workspace = true }
-
+pretty-simple-display = "0.1.0"
 
 [dev-dependencies]
 serial_test = "3.1"
 dotenv = "0.15"
-pretty-simple-display = "0.1.0"
+
 
 [workspace.dependencies]
 deribit-base = "0.2"
