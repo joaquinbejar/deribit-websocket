@@ -1,0 +1,31 @@
+name: SEMVER
+
+# Temporarily disabled: baseline v0.1.x on crates.io uses removed deribit_base macros
+# Re-enable after v0.2.0 is published with pretty-simple-display
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUST_BACKTRACE: full
+
+jobs:
+  semver:
+    name: semver
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y make libfontconfig1-dev pkg-config build-essential
+
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: deribit-websocket
+          feature-group: all-features
+          rust-toolchain: stable
