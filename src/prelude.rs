@@ -40,8 +40,8 @@ pub use crate::subscriptions::SubscriptionChannel;
 // Constants
 pub use crate::constants::*;
 
-// Re-export commonly used types from deribit-base
-pub use deribit_base::prelude::*;
+// Utility functions
+pub use crate::utils::setup_logger;
 
 // Re-export commonly used external types
 pub use serde_json::{Value, json};

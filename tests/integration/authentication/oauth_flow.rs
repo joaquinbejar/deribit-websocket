@@ -10,7 +10,6 @@
 use std::path::Path;
 use tracing::{debug, error, info, warn};
 
-use deribit_base::prelude::*;
 use deribit_websocket::prelude::*;
 
 /// Check if .env file exists and contains required variables
