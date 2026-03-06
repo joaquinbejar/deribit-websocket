@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tracing::info!("📨 Processing message #{}: {}", *count, msg_type);
 
                     // Simulate processing failure for demonstration (every 5th message)
-                    if *count % 5 == 0 {
+                    if (*count).is_multiple_of(5) {
                         tracing::warn!("⚠️ Simulating processing error for message #{}", *count);
                         return Err(WebSocketError::InvalidMessage(format!(
                             "Simulated processing error for message #{}",

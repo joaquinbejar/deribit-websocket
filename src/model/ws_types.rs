@@ -4,11 +4,11 @@
 //! including JSON-RPC message types, connection states, and WebSocket-specific
 //! request/response structures.
 
-use deribit_base::{impl_json_debug_pretty, impl_json_display};
+use pretty_simple_display::{DebugPretty, DisplaySimple};
 use serde::{Deserialize, Serialize};
 
 /// WebSocket message types for JSON-RPC communication
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, DebugPretty, DisplaySimple)]
 pub enum WebSocketMessage {
     /// JSON-RPC request message
     Request(JsonRpcRequest),
@@ -19,7 +19,7 @@ pub enum WebSocketMessage {
 }
 
 /// JSON-RPC 2.0 request structure
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, DebugPretty, DisplaySimple)]
 pub struct JsonRpcRequest {
     /// JSON-RPC version (always "2.0")
     pub jsonrpc: String,
@@ -32,7 +32,7 @@ pub struct JsonRpcRequest {
 }
 
 /// JSON-RPC 2.0 response structure
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, DebugPretty, DisplaySimple)]
 pub struct JsonRpcResponse {
     /// JSON-RPC version (always "2.0")
     pub jsonrpc: String,
@@ -44,7 +44,7 @@ pub struct JsonRpcResponse {
 }
 
 /// JSON-RPC 2.0 result or error union
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, DebugPretty, DisplaySimple)]
 #[serde(untagged)]
 pub enum JsonRpcResult {
     /// Successful result
@@ -60,7 +60,7 @@ pub enum JsonRpcResult {
 }
 
 /// JSON-RPC 2.0 error structure
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, DebugPretty, DisplaySimple)]
 pub struct JsonRpcError {
     /// Error code
     pub code: i32,
@@ -71,7 +71,7 @@ pub struct JsonRpcError {
 }
 
 /// JSON-RPC 2.0 notification structure (no response expected)
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, DebugPretty, DisplaySimple)]
 pub struct JsonRpcNotification {
     /// JSON-RPC version (always "2.0")
     pub jsonrpc: String,
@@ -153,7 +153,7 @@ pub enum SubscriptionChannel {
 }
 
 /// WebSocket request structure for Deribit API
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, DebugPretty, DisplaySimple)]
 pub struct WsRequest {
     /// JSON-RPC version
     pub jsonrpc: String,
@@ -166,7 +166,7 @@ pub struct WsRequest {
 }
 
 /// WebSocket response structure for Deribit API
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, DebugPretty, DisplaySimple)]
 pub struct WsResponse {
     /// JSON-RPC version
     pub jsonrpc: String,
@@ -364,28 +364,3 @@ impl Default for HeartbeatStatus {
         Self::new()
     }
 }
-
-// JSON formatting implementations
-impl_json_display!(WebSocketMessage);
-impl_json_debug_pretty!(WebSocketMessage);
-
-impl_json_display!(JsonRpcRequest);
-impl_json_debug_pretty!(JsonRpcRequest);
-
-impl_json_display!(JsonRpcResponse);
-impl_json_debug_pretty!(JsonRpcResponse);
-
-impl_json_display!(JsonRpcResult);
-impl_json_debug_pretty!(JsonRpcResult);
-
-impl_json_display!(JsonRpcError);
-impl_json_debug_pretty!(JsonRpcError);
-
-impl_json_display!(JsonRpcNotification);
-impl_json_debug_pretty!(JsonRpcNotification);
-
-impl_json_display!(WsRequest);
-impl_json_debug_pretty!(WsRequest);
-
-impl_json_display!(WsResponse);
-impl_json_debug_pretty!(WsResponse);

@@ -1,10 +1,10 @@
 //! WebSocket message types
 
+use pretty_simple_display::{DebugPretty, DisplaySimple};
 use serde::{Deserialize, Serialize};
-use crate::{impl_json_debug_pretty, impl_json_display};
 
 /// WebSocket request message
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, DebugPretty, DisplaySimple)]
 pub struct WsRequest {
     /// JSON-RPC version (typically "2.0")
     pub jsonrpc: String,
@@ -17,7 +17,7 @@ pub struct WsRequest {
 }
 
 /// WebSocket response message
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, DebugPretty, DisplaySimple)]
 pub struct WsResponse {
     /// JSON-RPC version (typically "2.0")
     pub jsonrpc: String,
@@ -29,9 +29,3 @@ pub struct WsResponse {
     pub error: Option<serde_json::Value>,
 }
 
-// Debug and Display implementations
-impl_json_debug_pretty!(WsRequest);
-impl_json_display!(WsRequest);
-
-impl_json_debug_pretty!(WsResponse);
-impl_json_display!(WsResponse);
