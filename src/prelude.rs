@@ -29,6 +29,10 @@ pub use crate::model::{
         MmpGroupConfig, MmpGroupStatus, MmpTrigger, Quote, QuoteError, QuoteInfo,
     },
     subscription::{Subscription, SubscriptionManager},
+    trading::{
+        EditOrderRequest, OrderInfo, OrderRequest, OrderResponse, OrderType, TimeInForce,
+        TradeExecution, Trigger,
+    },
 };
 
 // Session management

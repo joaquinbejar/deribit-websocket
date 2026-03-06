@@ -372,6 +372,215 @@ impl DeribitWebSocketClient {
         }
     }
 
+    /// Place a buy order
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The order request parameters
+    ///
+    /// # Returns
+    ///
+    /// Returns `OrderResponse` containing order info and any immediate trades
+    pub async fn buy(
+        &self,
+        request: crate::model::trading::OrderRequest,
+    ) -> Result<crate::model::trading::OrderResponse, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_buy_request(&request)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!("Failed to parse buy response: {}", e))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Place a sell order
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The order request parameters
+    ///
+    /// # Returns
+    ///
+    /// Returns `OrderResponse` containing order info and any immediate trades
+    pub async fn sell(
+        &self,
+        request: crate::model::trading::OrderRequest,
+    ) -> Result<crate::model::trading::OrderResponse, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_sell_request(&request)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!("Failed to parse sell response: {}", e))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Cancel an order by ID
+    ///
+    /// # Arguments
+    ///
+    /// * `order_id` - The order ID to cancel
+    ///
+    /// # Returns
+    ///
+    /// Returns `OrderInfo` for the cancelled order
+    pub async fn cancel(
+        &self,
+        order_id: &str,
+    ) -> Result<crate::model::trading::OrderInfo, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_cancel_request(order_id)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!("Failed to parse cancel response: {}", e))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Cancel all orders
+    ///
+    /// # Returns
+    ///
+    /// Returns the number of orders cancelled
+    pub async fn cancel_all(&self) -> Result<u32, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_cancel_all_request()
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "Failed to parse cancel_all response: {}",
+                    e
+                ))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Cancel all orders by currency
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - Currency to cancel orders for (e.g., "BTC", "ETH")
+    ///
+    /// # Returns
+    ///
+    /// Returns the number of orders cancelled
+    pub async fn cancel_all_by_currency(&self, currency: &str) -> Result<u32, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_cancel_all_by_currency_request(currency)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "Failed to parse cancel_all_by_currency response: {}",
+                    e
+                ))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Cancel all orders by instrument
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument_name` - Instrument name to cancel orders for (e.g., "BTC-PERPETUAL")
+    ///
+    /// # Returns
+    ///
+    /// Returns the number of orders cancelled
+    pub async fn cancel_all_by_instrument(
+        &self,
+        instrument_name: &str,
+    ) -> Result<u32, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_cancel_all_by_instrument_request(instrument_name)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "Failed to parse cancel_all_by_instrument response: {}",
+                    e
+                ))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Edit an existing order
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The edit order request parameters
+    ///
+    /// # Returns
+    ///
+    /// Returns `OrderResponse` containing updated order info and any trades
+    pub async fn edit(
+        &self,
+        request: crate::model::trading::EditOrderRequest,
+    ) -> Result<crate::model::trading::OrderResponse, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_edit_request(&request)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!("Failed to parse edit response: {}", e))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
     /// Set message handler with callbacks
     /// The message_callback processes each incoming message and returns Result<(), Error>
     /// The error_callback is called only when message_callback returns an error
