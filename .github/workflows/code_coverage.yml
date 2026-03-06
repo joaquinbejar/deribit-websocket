@@ -38,7 +38,8 @@ jobs:
           cargo tarpaulin \
             --all-features \
             --timeout 180 \
-            --out Xml
+            --out Xml \
+            --exclude-files "tests/integration/*"
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
