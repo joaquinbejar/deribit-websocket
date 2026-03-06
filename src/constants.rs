@@ -24,10 +24,14 @@ pub mod methods {
     pub const PUBLIC_SUBSCRIBE: &str = "public/subscribe";
     /// Public unsubscription method
     pub const PUBLIC_UNSUBSCRIBE: &str = "public/unsubscribe";
+    /// Public unsubscribe from all channels
+    pub const PUBLIC_UNSUBSCRIBE_ALL: &str = "public/unsubscribe_all";
     /// Private subscription method
     pub const PRIVATE_SUBSCRIBE: &str = "private/subscribe";
     /// Private unsubscription method
     pub const PRIVATE_UNSUBSCRIBE: &str = "private/unsubscribe";
+    /// Private unsubscribe from all channels
+    pub const PRIVATE_UNSUBSCRIBE_ALL: &str = "private/unsubscribe_all";
 
     // Market data
     /// Get ticker information

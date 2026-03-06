@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Position types: `ClosePositionResponse`, `CloseTrade`, `CloseOrder`, `MovePositionTrade`, `MovePositionResult`
 - Request builders for position management operations
 - Comprehensive unit tests for position module (25+ tests)
+- Subscription management methods: `public_unsubscribe_all()`, `private_unsubscribe_all()`
+- Request builders for unsubscribe_all operations
+- Unit tests for unsubscribe_all and SubscriptionManager.clear()
 
 ### Fixed
 - `parse_channel_type()` now correctly handles all 14 `SubscriptionChannel` variants instead of only 5

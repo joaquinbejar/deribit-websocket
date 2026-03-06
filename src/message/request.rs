@@ -66,6 +66,35 @@ impl RequestBuilder {
         self.build_request("public/unsubscribe", Some(params))
     }
 
+    /// Build public unsubscribe_all request
+    ///
+    /// Unsubscribes from all public channels. Takes no parameters.
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for unsubscribing from all public channels
+    pub fn build_public_unsubscribe_all_request(&mut self) -> JsonRpcRequest {
+        self.build_request(
+            crate::constants::methods::PUBLIC_UNSUBSCRIBE_ALL,
+            Some(serde_json::json!({})),
+        )
+    }
+
+    /// Build private unsubscribe_all request
+    ///
+    /// Unsubscribes from all private channels. Takes no parameters.
+    /// Requires authentication.
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for unsubscribing from all private channels
+    pub fn build_private_unsubscribe_all_request(&mut self) -> JsonRpcRequest {
+        self.build_request(
+            crate::constants::methods::PRIVATE_UNSUBSCRIBE_ALL,
+            Some(serde_json::json!({})),
+        )
+    }
+
     /// Build test request
     pub fn build_test_request(&mut self) -> JsonRpcRequest {
         self.build_request("public/test", None)
