@@ -24,6 +24,7 @@ pub use crate::message::{
 
 // Model types
 pub use crate::model::{
+    account::{AccountSummary, CurrencySummary, Direction, Position},
     quote::{
         CancelQuotesRequest, CancelQuotesResponse, MassQuoteRequest, MassQuoteResult,
         MmpGroupConfig, MmpGroupStatus, MmpTrigger, Quote, QuoteError, QuoteInfo,

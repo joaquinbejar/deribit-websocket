@@ -64,6 +64,10 @@ pub mod methods {
     pub const PRIVATE_GET_POSITIONS: &str = "private/get_positions";
     /// Get subaccounts
     pub const PRIVATE_GET_SUBACCOUNTS: &str = "private/get_subaccounts";
+    /// Get order state
+    pub const PRIVATE_GET_ORDER_STATE: &str = "private/get_order_state";
+    /// Get order history by currency
+    pub const PRIVATE_GET_ORDER_HISTORY_BY_CURRENCY: &str = "private/get_order_history_by_currency";
 
     // Test
     /// Test connection

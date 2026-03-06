@@ -346,4 +346,141 @@ impl RequestBuilder {
 
         self.build_request("private/edit", Some(params))
     }
+
+    // Account methods
+
+    /// Build a get_positions request
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - Currency filter (BTC, ETH, USDC, etc.) - optional
+    /// * `kind` - Kind filter (future, option, spot, etc.) - optional
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for getting positions
+    pub fn build_get_positions_request(
+        &mut self,
+        currency: Option<&str>,
+        kind: Option<&str>,
+    ) -> JsonRpcRequest {
+        let mut params = serde_json::Map::new();
+
+        if let Some(currency) = currency {
+            params.insert(
+                "currency".to_string(),
+                serde_json::Value::String(currency.to_string()),
+            );
+        }
+
+        if let Some(kind) = kind {
+            params.insert(
+                "kind".to_string(),
+                serde_json::Value::String(kind.to_string()),
+            );
+        }
+
+        if params.is_empty() {
+            self.build_request(crate::constants::methods::PRIVATE_GET_POSITIONS, None)
+        } else {
+            self.build_request(
+                crate::constants::methods::PRIVATE_GET_POSITIONS,
+                Some(serde_json::Value::Object(params)),
+            )
+        }
+    }
+
+    /// Build a get_account_summary request
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - Currency to get summary for (BTC, ETH, USDC, etc.)
+    /// * `extended` - Whether to include extended information
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for getting account summary
+    pub fn build_get_account_summary_request(
+        &mut self,
+        currency: &str,
+        extended: Option<bool>,
+    ) -> JsonRpcRequest {
+        let mut params = serde_json::Map::new();
+        params.insert(
+            "currency".to_string(),
+            serde_json::Value::String(currency.to_string()),
+        );
+
+        if let Some(extended) = extended {
+            params.insert("extended".to_string(), serde_json::Value::Bool(extended));
+        }
+
+        self.build_request(
+            crate::constants::methods::PRIVATE_GET_ACCOUNT_SUMMARY,
+            Some(serde_json::Value::Object(params)),
+        )
+    }
+
+    /// Build a get_order_state request
+    ///
+    /// # Arguments
+    ///
+    /// * `order_id` - The order ID to get state for
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for getting order state
+    pub fn build_get_order_state_request(&mut self, order_id: &str) -> JsonRpcRequest {
+        let params = serde_json::json!({
+            "order_id": order_id
+        });
+
+        self.build_request(
+            crate::constants::methods::PRIVATE_GET_ORDER_STATE,
+            Some(params),
+        )
+    }
+
+    /// Build a get_order_history_by_currency request
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - Currency to get order history for
+    /// * `kind` - Kind filter (future, option, spot, etc.) - optional
+    /// * `count` - Number of items to return - optional
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for getting order history
+    pub fn build_get_order_history_by_currency_request(
+        &mut self,
+        currency: &str,
+        kind: Option<&str>,
+        count: Option<u32>,
+    ) -> JsonRpcRequest {
+        let mut params = serde_json::Map::new();
+        params.insert(
+            "currency".to_string(),
+            serde_json::Value::String(currency.to_string()),
+        );
+
+        if let Some(kind) = kind {
+            params.insert(
+                "kind".to_string(),
+                serde_json::Value::String(kind.to_string()),
+            );
+        }
+
+        if let Some(count) = count {
+            params.insert(
+                "count".to_string(),
+                serde_json::Value::Number(serde_json::Number::from(count)),
+            );
+        }
+
+        self.build_request(
+            crate::constants::methods::PRIVATE_GET_ORDER_HISTORY_BY_CURRENCY,
+            Some(serde_json::Value::Object(params)),
+        )
+    }
 }

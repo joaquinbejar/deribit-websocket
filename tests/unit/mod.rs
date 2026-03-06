@@ -3,6 +3,7 @@
 //! This module contains comprehensive unit tests organized by functionality.
 //! Each submodule tests a specific component of the WebSocket client.
 
+pub mod account;
 pub mod callback;
 pub mod client;
 pub mod config;
