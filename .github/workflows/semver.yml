@@ -1,14 +1,9 @@
 name: SEMVER
 
+# Temporarily disabled: baseline v0.1.x on crates.io uses removed deribit_base macros
+# Re-enable after v0.2.0 is published with pretty-simple-display
 on:
-  push:
-    branches:
-      - main
-      - "release/**"
-  pull_request:
-    branches:
-      - main
-      - "release/**"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
