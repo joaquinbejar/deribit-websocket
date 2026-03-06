@@ -204,7 +204,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     while start_time.elapsed() < monitor_duration {
         // Check MMP status every 5 seconds
-        if start_time.elapsed().as_secs() % 5 == 0 {
+        if start_time.elapsed().as_secs().is_multiple_of(5) {
             match client.get_mmp_config(None).await {
                 Ok(configs) => {
                     tracing::info!("📊 MMP Status Check:");
