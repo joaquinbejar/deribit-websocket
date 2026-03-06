@@ -69,6 +69,12 @@ pub mod methods {
     /// Get order history by currency
     pub const PRIVATE_GET_ORDER_HISTORY_BY_CURRENCY: &str = "private/get_order_history_by_currency";
 
+    // Position management
+    /// Close an existing position
+    pub const PRIVATE_CLOSE_POSITION: &str = "private/close_position";
+    /// Move positions between subaccounts
+    pub const PRIVATE_MOVE_POSITIONS: &str = "private/move_positions";
+
     // Test
     /// Test connection
     pub const PUBLIC_TEST: &str = "public/test";

@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Account types: `Position`, `AccountSummary`, `CurrencySummary`, `Direction`
 - Request builders for all account operations
 - Comprehensive unit tests for account module (25+ tests)
+- Position management methods over WebSocket: `close_position()`, `move_positions()`
+- Position types: `ClosePositionResponse`, `CloseTrade`, `CloseOrder`, `MovePositionTrade`, `MovePositionResult`
+- Request builders for position management operations
+- Comprehensive unit tests for position module (25+ tests)
 
 ### Fixed
 - `parse_channel_type()` now correctly handles all 14 `SubscriptionChannel` variants instead of only 5

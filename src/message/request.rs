@@ -483,4 +483,97 @@ impl RequestBuilder {
             Some(serde_json::Value::Object(params)),
         )
     }
+
+    // Position management methods
+
+    /// Build a close_position request
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument_name` - The instrument to close position for
+    /// * `order_type` - Order type: "limit" or "market"
+    /// * `price` - Price for limit orders (required if order_type is "limit")
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for closing a position
+    pub fn build_close_position_request(
+        &mut self,
+        instrument_name: &str,
+        order_type: &str,
+        price: Option<f64>,
+    ) -> JsonRpcRequest {
+        let mut params = serde_json::Map::new();
+        params.insert(
+            "instrument_name".to_string(),
+            serde_json::Value::String(instrument_name.to_string()),
+        );
+        params.insert(
+            "type".to_string(),
+            serde_json::Value::String(order_type.to_string()),
+        );
+
+        if let Some(price) = price
+            && let Some(price_num) = serde_json::Number::from_f64(price)
+        {
+            params.insert("price".to_string(), serde_json::Value::Number(price_num));
+        }
+
+        self.build_request(
+            crate::constants::methods::PRIVATE_CLOSE_POSITION,
+            Some(serde_json::Value::Object(params)),
+        )
+    }
+
+    /// Build a move_positions request
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - Currency for the positions (BTC, ETH, etc.)
+    /// * `source_uid` - Source subaccount ID
+    /// * `target_uid` - Target subaccount ID
+    /// * `trades` - List of positions to move
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for moving positions between subaccounts
+    pub fn build_move_positions_request(
+        &mut self,
+        currency: &str,
+        source_uid: u64,
+        target_uid: u64,
+        trades: &[crate::model::MovePositionTrade],
+    ) -> JsonRpcRequest {
+        let trades_json: Vec<serde_json::Value> = trades
+            .iter()
+            .map(|t| {
+                let mut trade_obj = serde_json::Map::new();
+                trade_obj.insert(
+                    "instrument_name".to_string(),
+                    serde_json::Value::String(t.instrument_name.clone()),
+                );
+                if let Some(amount_num) = serde_json::Number::from_f64(t.amount) {
+                    trade_obj.insert("amount".to_string(), serde_json::Value::Number(amount_num));
+                }
+                if let Some(price) = t.price
+                    && let Some(price_num) = serde_json::Number::from_f64(price)
+                {
+                    trade_obj.insert("price".to_string(), serde_json::Value::Number(price_num));
+                }
+                serde_json::Value::Object(trade_obj)
+            })
+            .collect();
+
+        let params = serde_json::json!({
+            "currency": currency,
+            "source_uid": source_uid,
+            "target_uid": target_uid,
+            "trades": trades_json
+        });
+
+        self.build_request(
+            crate::constants::methods::PRIVATE_MOVE_POSITIONS,
+            Some(params),
+        )
+    }
 }

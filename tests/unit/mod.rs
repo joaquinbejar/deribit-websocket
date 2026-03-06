@@ -11,6 +11,7 @@ pub mod connection;
 pub mod error;
 pub mod message;
 pub mod model;
+pub mod position;
 pub mod session;
 pub mod subscription_channel;
 pub mod subscriptions;
