@@ -311,7 +311,8 @@ fn test_request_builder_get_order_history_by_currency() {
 #[test]
 fn test_request_builder_get_order_history_with_filters() {
     let mut builder = RequestBuilder::new();
-    let request = builder.build_get_order_history_by_currency_request("ETH", Some("future"), Some(50));
+    let request =
+        builder.build_get_order_history_by_currency_request("ETH", Some("future"), Some(50));
 
     assert_eq!(request.method, "private/get_order_history_by_currency");
     assert!(request.params.is_some());

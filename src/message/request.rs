@@ -381,7 +381,7 @@ impl RequestBuilder {
         }
 
         if params.is_empty() {
-            self.build_request(crate::constants::methods::PRIVATE_GET_POSITIONS, None::<()>)
+            self.build_request(crate::constants::methods::PRIVATE_GET_POSITIONS, None)
         } else {
             self.build_request(
                 crate::constants::methods::PRIVATE_GET_POSITIONS,
