@@ -48,6 +48,12 @@ pub mod methods {
     pub const PRIVATE_CANCEL: &str = "private/cancel";
     /// Cancel all orders
     pub const PRIVATE_CANCEL_ALL: &str = "private/cancel_all";
+    /// Cancel all orders by currency
+    pub const PRIVATE_CANCEL_ALL_BY_CURRENCY: &str = "private/cancel_all_by_currency";
+    /// Cancel all orders by instrument
+    pub const PRIVATE_CANCEL_ALL_BY_INSTRUMENT: &str = "private/cancel_all_by_instrument";
+    /// Edit an existing order
+    pub const PRIVATE_EDIT: &str = "private/edit";
     /// Get open orders
     pub const PRIVATE_GET_OPEN_ORDERS: &str = "private/get_open_orders";
 

@@ -12,3 +12,4 @@ pub mod message;
 pub mod model;
 pub mod session;
 pub mod subscriptions;
+pub mod trading;

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions CI/CD pipeline (build, lint, test, coverage, semver)
 - Dependabot configuration for automated dependency updates
 - Local `utils` module with `setup_logger()` function
+- Trading methods over WebSocket: `buy()`, `sell()`, `cancel()`, `cancel_all()`, `cancel_all_by_currency()`, `cancel_all_by_instrument()`, `edit()`
+- New trading types: `OrderRequest`, `EditOrderRequest`, `OrderResponse`, `OrderInfo`, `OrderType`, `TimeInForce`, `Trigger`, `TradeExecution`
+- Request builders for all trading operations
+- Comprehensive unit tests for trading module (36 tests)
 
 ### Removed
 - **BREAKING**: Removed `deribit-base` dependency - crate is now fully self-contained

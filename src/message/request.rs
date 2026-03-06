@@ -1,6 +1,6 @@
 //! WebSocket request message handling
 
-use crate::model::{quote::*, ws_types::JsonRpcRequest};
+use crate::model::{quote::*, trading::*, ws_types::JsonRpcRequest};
 
 /// Request builder for WebSocket messages
 #[derive(Debug, Clone)]
@@ -155,5 +155,195 @@ impl RequestBuilder {
         }
 
         self.build_request("private/get_open_orders", Some(params))
+    }
+
+    /// Build buy order request
+    pub fn build_buy_request(&mut self, request: &OrderRequest) -> JsonRpcRequest {
+        let mut params = serde_json::json!({
+            "instrument_name": request.instrument_name,
+            "amount": request.amount
+        });
+
+        if let Some(ref order_type) = request.order_type {
+            params["type"] = serde_json::Value::String(order_type.as_str().to_string());
+        }
+        if let Some(price) = request.price {
+            params["price"] = serde_json::Value::Number(
+                serde_json::Number::from_f64(price).unwrap_or(serde_json::Number::from(0)),
+            );
+        }
+        if let Some(ref label) = request.label {
+            params["label"] = serde_json::Value::String(label.clone());
+        }
+        if let Some(ref tif) = request.time_in_force {
+            params["time_in_force"] = serde_json::Value::String(tif.as_str().to_string());
+        }
+        if let Some(max_show) = request.max_show {
+            params["max_show"] = serde_json::Value::Number(
+                serde_json::Number::from_f64(max_show).unwrap_or(serde_json::Number::from(0)),
+            );
+        }
+        if let Some(post_only) = request.post_only {
+            params["post_only"] = serde_json::Value::Bool(post_only);
+        }
+        if let Some(reduce_only) = request.reduce_only {
+            params["reduce_only"] = serde_json::Value::Bool(reduce_only);
+        }
+        if let Some(trigger_price) = request.trigger_price {
+            params["trigger_price"] = serde_json::Value::Number(
+                serde_json::Number::from_f64(trigger_price).unwrap_or(serde_json::Number::from(0)),
+            );
+        }
+        if let Some(ref trigger) = request.trigger {
+            let trigger_str = match trigger {
+                Trigger::IndexPrice => "index_price",
+                Trigger::MarkPrice => "mark_price",
+                Trigger::LastPrice => "last_price",
+            };
+            params["trigger"] = serde_json::Value::String(trigger_str.to_string());
+        }
+        if let Some(ref advanced) = request.advanced {
+            params["advanced"] = serde_json::Value::String(advanced.clone());
+        }
+        if let Some(mmp) = request.mmp {
+            params["mmp"] = serde_json::Value::Bool(mmp);
+        }
+        if let Some(valid_until) = request.valid_until {
+            params["valid_until"] =
+                serde_json::Value::Number(serde_json::Number::from(valid_until));
+        }
+
+        self.build_request("private/buy", Some(params))
+    }
+
+    /// Build sell order request
+    pub fn build_sell_request(&mut self, request: &OrderRequest) -> JsonRpcRequest {
+        let mut params = serde_json::json!({
+            "instrument_name": request.instrument_name,
+            "amount": request.amount
+        });
+
+        if let Some(ref order_type) = request.order_type {
+            params["type"] = serde_json::Value::String(order_type.as_str().to_string());
+        }
+        if let Some(price) = request.price {
+            params["price"] = serde_json::Value::Number(
+                serde_json::Number::from_f64(price).unwrap_or(serde_json::Number::from(0)),
+            );
+        }
+        if let Some(ref label) = request.label {
+            params["label"] = serde_json::Value::String(label.clone());
+        }
+        if let Some(ref tif) = request.time_in_force {
+            params["time_in_force"] = serde_json::Value::String(tif.as_str().to_string());
+        }
+        if let Some(max_show) = request.max_show {
+            params["max_show"] = serde_json::Value::Number(
+                serde_json::Number::from_f64(max_show).unwrap_or(serde_json::Number::from(0)),
+            );
+        }
+        if let Some(post_only) = request.post_only {
+            params["post_only"] = serde_json::Value::Bool(post_only);
+        }
+        if let Some(reduce_only) = request.reduce_only {
+            params["reduce_only"] = serde_json::Value::Bool(reduce_only);
+        }
+        if let Some(trigger_price) = request.trigger_price {
+            params["trigger_price"] = serde_json::Value::Number(
+                serde_json::Number::from_f64(trigger_price).unwrap_or(serde_json::Number::from(0)),
+            );
+        }
+        if let Some(ref trigger) = request.trigger {
+            let trigger_str = match trigger {
+                Trigger::IndexPrice => "index_price",
+                Trigger::MarkPrice => "mark_price",
+                Trigger::LastPrice => "last_price",
+            };
+            params["trigger"] = serde_json::Value::String(trigger_str.to_string());
+        }
+        if let Some(ref advanced) = request.advanced {
+            params["advanced"] = serde_json::Value::String(advanced.clone());
+        }
+        if let Some(mmp) = request.mmp {
+            params["mmp"] = serde_json::Value::Bool(mmp);
+        }
+        if let Some(valid_until) = request.valid_until {
+            params["valid_until"] =
+                serde_json::Value::Number(serde_json::Number::from(valid_until));
+        }
+
+        self.build_request("private/sell", Some(params))
+    }
+
+    /// Build cancel order request
+    pub fn build_cancel_request(&mut self, order_id: &str) -> JsonRpcRequest {
+        let params = serde_json::json!({
+            "order_id": order_id
+        });
+
+        self.build_request("private/cancel", Some(params))
+    }
+
+    /// Build cancel all orders request
+    pub fn build_cancel_all_request(&mut self) -> JsonRpcRequest {
+        self.build_request("private/cancel_all", Some(serde_json::json!({})))
+    }
+
+    /// Build cancel all orders by currency request
+    pub fn build_cancel_all_by_currency_request(&mut self, currency: &str) -> JsonRpcRequest {
+        let params = serde_json::json!({
+            "currency": currency
+        });
+
+        self.build_request("private/cancel_all_by_currency", Some(params))
+    }
+
+    /// Build cancel all orders by instrument request
+    pub fn build_cancel_all_by_instrument_request(
+        &mut self,
+        instrument_name: &str,
+    ) -> JsonRpcRequest {
+        let params = serde_json::json!({
+            "instrument_name": instrument_name
+        });
+
+        self.build_request("private/cancel_all_by_instrument", Some(params))
+    }
+
+    /// Build edit order request
+    pub fn build_edit_request(&mut self, request: &EditOrderRequest) -> JsonRpcRequest {
+        let mut params = serde_json::json!({
+            "order_id": request.order_id,
+            "amount": request.amount
+        });
+
+        if let Some(price) = request.price {
+            params["price"] = serde_json::Value::Number(
+                serde_json::Number::from_f64(price).unwrap_or(serde_json::Number::from(0)),
+            );
+        }
+        if let Some(post_only) = request.post_only {
+            params["post_only"] = serde_json::Value::Bool(post_only);
+        }
+        if let Some(reduce_only) = request.reduce_only {
+            params["reduce_only"] = serde_json::Value::Bool(reduce_only);
+        }
+        if let Some(ref advanced) = request.advanced {
+            params["advanced"] = serde_json::Value::String(advanced.clone());
+        }
+        if let Some(trigger_price) = request.trigger_price {
+            params["trigger_price"] = serde_json::Value::Number(
+                serde_json::Number::from_f64(trigger_price).unwrap_or(serde_json::Number::from(0)),
+            );
+        }
+        if let Some(mmp) = request.mmp {
+            params["mmp"] = serde_json::Value::Bool(mmp);
+        }
+        if let Some(valid_until) = request.valid_until {
+            params["valid_until"] =
+                serde_json::Value::Number(serde_json::Number::from(valid_until));
+        }
+
+        self.build_request("private/edit", Some(params))
     }
 }
