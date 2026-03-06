@@ -152,6 +152,82 @@ impl DeribitWebSocketClient {
         self.send_request(request).await
     }
 
+    /// Unsubscribe from all public channels
+    ///
+    /// Unsubscribes from all public channels subscribed so far and clears
+    /// the local subscription manager state.
+    ///
+    /// # Returns
+    ///
+    /// Returns `"ok"` on success
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be parsed
+    pub async fn public_unsubscribe_all(&self) -> Result<String, WebSocketError> {
+        let request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_public_unsubscribe_all_request()
+        };
+
+        let response = self.send_request(request).await?;
+
+        // Clear subscription manager
+        let mut sub_manager = self.subscription_manager.lock().await;
+        sub_manager.clear();
+
+        match response.result {
+            JsonRpcResult::Success { result } => {
+                result.as_str().map(String::from).ok_or_else(|| {
+                    WebSocketError::InvalidMessage(
+                        "Expected string result from unsubscribe_all".to_string(),
+                    )
+                })
+            }
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Unsubscribe from all private channels
+    ///
+    /// Unsubscribes from all private channels subscribed so far and clears
+    /// the local subscription manager state. Requires authentication.
+    ///
+    /// # Returns
+    ///
+    /// Returns `"ok"` on success
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be parsed
+    pub async fn private_unsubscribe_all(&self) -> Result<String, WebSocketError> {
+        let request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_private_unsubscribe_all_request()
+        };
+
+        let response = self.send_request(request).await?;
+
+        // Clear subscription manager
+        let mut sub_manager = self.subscription_manager.lock().await;
+        sub_manager.clear();
+
+        match response.result {
+            JsonRpcResult::Success { result } => {
+                result.as_str().map(String::from).ok_or_else(|| {
+                    WebSocketError::InvalidMessage(
+                        "Expected string result from unsubscribe_all".to_string(),
+                    )
+                })
+            }
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
     /// Send a JSON-RPC request
     pub async fn send_request(
         &self,

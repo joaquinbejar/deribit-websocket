@@ -160,3 +160,76 @@ fn test_subscription_manager_debug() {
 
     assert!(debug_str.contains("SubscriptionManager"));
 }
+
+#[test]
+fn test_subscription_manager_clear() {
+    let mut manager = SubscriptionManager::new();
+
+    // Add multiple subscriptions
+    manager.add_subscription(
+        "ticker.BTC-PERPETUAL".to_string(),
+        SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string()),
+        Some("BTC-PERPETUAL".to_string()),
+    );
+    manager.add_subscription(
+        "book.ETH-PERPETUAL.100ms".to_string(),
+        SubscriptionChannel::OrderBook("ETH-PERPETUAL".to_string()),
+        Some("ETH-PERPETUAL".to_string()),
+    );
+    manager.add_subscription(
+        "user.orders".to_string(),
+        SubscriptionChannel::UserOrders,
+        None,
+    );
+
+    assert_eq!(manager.get_all_channels().len(), 3);
+
+    // Clear all subscriptions
+    manager.clear();
+
+    assert!(manager.get_all_channels().is_empty());
+    assert!(manager.active_subscriptions().is_empty());
+}
+
+#[test]
+fn test_subscription_manager_clear_empty() {
+    let mut manager = SubscriptionManager::new();
+
+    // Clear an already empty manager should not panic
+    manager.clear();
+
+    assert!(manager.get_all_channels().is_empty());
+}
+
+// Request builder tests for unsubscribe_all
+
+use deribit_websocket::prelude::RequestBuilder;
+
+#[test]
+fn test_request_builder_public_unsubscribe_all() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_public_unsubscribe_all_request();
+
+    assert_eq!(request.method, "public/unsubscribe_all");
+    assert!(request.params.is_some());
+}
+
+#[test]
+fn test_request_builder_private_unsubscribe_all() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_private_unsubscribe_all_request();
+
+    assert_eq!(request.method, "private/unsubscribe_all");
+    assert!(request.params.is_some());
+}
+
+#[test]
+fn test_request_builder_unsubscribe_all_incremental_ids() {
+    let mut builder = RequestBuilder::new();
+
+    let r1 = builder.build_public_unsubscribe_all_request();
+    let r2 = builder.build_private_unsubscribe_all_request();
+
+    assert_eq!(r1.id, serde_json::json!(1));
+    assert_eq!(r2.id, serde_json::json!(2));
+}
