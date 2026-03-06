@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Unknown` variant to `SubscriptionChannel` for unrecognized channel patterns
 - `is_unknown()` helper method on `SubscriptionChannel`
 - Comprehensive tests for all subscription channel parsing patterns (45 tests)
+- Account methods over WebSocket: `get_positions()`, `get_account_summary()`, `get_order_state()`, `get_order_history_by_currency()`
+- Account types: `Position`, `AccountSummary`, `CurrencySummary`, `Direction`
+- Request builders for all account operations
+- Comprehensive unit tests for account module (25+ tests)
 
 ### Fixed
 - `parse_channel_type()` now correctly handles all 14 `SubscriptionChannel` variants instead of only 5

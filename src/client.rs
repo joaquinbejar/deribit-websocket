@@ -581,6 +581,169 @@ impl DeribitWebSocketClient {
         }
     }
 
+    // Account methods
+
+    /// Get positions for the specified currency and kind
+    ///
+    /// Retrieves user positions filtered by currency and/or instrument kind.
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - Currency filter (BTC, ETH, USDC, etc.) - optional
+    /// * `kind` - Kind filter (future, option, spot, etc.) - optional
+    ///
+    /// # Returns
+    ///
+    /// A vector of positions matching the filter criteria
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be parsed
+    pub async fn get_positions(
+        &self,
+        currency: Option<&str>,
+        kind: Option<&str>,
+    ) -> Result<Vec<crate::model::Position>, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_get_positions_request(currency, kind)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!("Failed to parse positions response: {}", e))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Get account summary for the specified currency
+    ///
+    /// Retrieves account summary information including balance, margin, and other account details.
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - Currency to get summary for (BTC, ETH, USDC, etc.)
+    /// * `extended` - Whether to include extended information
+    ///
+    /// # Returns
+    ///
+    /// Account summary for the specified currency
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be parsed
+    pub async fn get_account_summary(
+        &self,
+        currency: &str,
+        extended: Option<bool>,
+    ) -> Result<crate::model::AccountSummary, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_get_account_summary_request(currency, extended)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "Failed to parse account summary response: {}",
+                    e
+                ))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Get the state of an order
+    ///
+    /// Retrieves detailed information about a specific order.
+    ///
+    /// # Arguments
+    ///
+    /// * `order_id` - The order ID to get state for
+    ///
+    /// # Returns
+    ///
+    /// Order information for the specified order
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be parsed
+    pub async fn get_order_state(
+        &self,
+        order_id: &str,
+    ) -> Result<crate::model::OrderInfo, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_get_order_state_request(order_id)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "Failed to parse order state response: {}",
+                    e
+                ))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Get order history by currency
+    ///
+    /// Retrieves historical orders for the specified currency.
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - Currency to get order history for
+    /// * `kind` - Kind filter (future, option, spot, etc.) - optional
+    /// * `count` - Number of items to return - optional
+    ///
+    /// # Returns
+    ///
+    /// A vector of historical orders matching the filter criteria
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be parsed
+    pub async fn get_order_history_by_currency(
+        &self,
+        currency: &str,
+        kind: Option<&str>,
+        count: Option<u32>,
+    ) -> Result<Vec<crate::model::OrderInfo>, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_get_order_history_by_currency_request(currency, kind, count)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "Failed to parse order history response: {}",
+                    e
+                ))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
     /// Set message handler with callbacks
     /// The message_callback processes each incoming message and returns Result<(), Error>
     /// The error_callback is called only when message_callback returns an error
