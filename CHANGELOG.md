@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - GitHub Actions CI/CD pipeline (build, lint, test, coverage, semver)
 - Dependabot configuration for automated dependency updates
+- Local `utils` module with `setup_logger()` function
+
+### Removed
+- **BREAKING**: Removed `deribit-base` dependency - crate is now fully self-contained
+- Removed `pub use deribit_base;` re-export from `lib.rs`
+- Removed `pub use deribit_base::prelude::*;` from `prelude.rs`
+
+### Changed
+- Added `tracing-subscriber` dependency for logger functionality
 
 ## [0.1.2] - 2024-03-06
 

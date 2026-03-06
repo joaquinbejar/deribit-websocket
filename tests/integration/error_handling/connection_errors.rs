@@ -12,7 +12,6 @@ use std::time::Duration;
 use tokio::time::{sleep, timeout};
 use tracing::info;
 
-use deribit_base::prelude::*;
 use deribit_websocket::prelude::*;
 
 /// Check if .env file exists and contains required variables

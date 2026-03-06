@@ -175,6 +175,5 @@ pub mod model;
 pub mod prelude;
 pub mod session;
 pub mod subscriptions;
-
-// Re-export common types from deribit-base
-pub use deribit_base;
+/// Utility functions and helpers
+pub mod utils;
