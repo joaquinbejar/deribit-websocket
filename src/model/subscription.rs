@@ -65,6 +65,7 @@ impl SubscriptionManager {
             | SubscriptionChannel::Funding(inst)
             | SubscriptionChannel::Perpetual(inst)
             | SubscriptionChannel::Quote(inst) => Some(inst.clone()),
+            SubscriptionChannel::Unknown(_) => None,
             _ => None,
         };
         self.add_subscription(channel, channel_type, instrument);

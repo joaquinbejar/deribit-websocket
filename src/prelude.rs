@@ -38,8 +38,8 @@ pub use crate::model::{
 // Session management
 pub use crate::session::WebSocketSession;
 
-// Subscription management
-pub use crate::subscriptions::SubscriptionChannel;
+// Subscription management (re-export from model for full channel support)
+pub use crate::model::SubscriptionChannel;
 
 // Constants
 pub use crate::constants::*;

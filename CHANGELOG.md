@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New trading types: `OrderRequest`, `EditOrderRequest`, `OrderResponse`, `OrderInfo`, `OrderType`, `TimeInForce`, `Trigger`, `TradeExecution`
 - Request builders for all trading operations
 - Comprehensive unit tests for trading module (36 tests)
+- `Unknown` variant to `SubscriptionChannel` for unrecognized channel patterns
+- `is_unknown()` helper method on `SubscriptionChannel`
+- Comprehensive tests for all subscription channel parsing patterns (45 tests)
+
+### Fixed
+- `parse_channel_type()` now correctly handles all 14 `SubscriptionChannel` variants instead of only 5
+- Unknown channels no longer incorrectly default to `Ticker(String::new())`
+
+### Deprecated
+- `subscriptions::SubscriptionChannel` - use `model::SubscriptionChannel` instead for full channel support
 
 ### Removed
 - **BREAKING**: Removed `deribit-base` dependency - crate is now fully self-contained

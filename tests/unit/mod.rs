@@ -11,5 +11,6 @@ pub mod error;
 pub mod message;
 pub mod model;
 pub mod session;
+pub mod subscription_channel;
 pub mod subscriptions;
 pub mod trading;

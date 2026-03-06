@@ -150,6 +150,8 @@ pub enum SubscriptionChannel {
     Perpetual(String),
     /// Quote updates
     Quote(String),
+    /// Unknown or unrecognized channel
+    Unknown(String),
 }
 
 /// WebSocket request structure for Deribit API
@@ -255,46 +257,66 @@ impl SubscriptionChannel {
             SubscriptionChannel::Funding(instrument) => format!("perpetual.{}.raw", instrument),
             SubscriptionChannel::Perpetual(instrument) => format!("perpetual.{}.raw", instrument),
             SubscriptionChannel::Quote(instrument) => format!("quote.{}", instrument),
+            SubscriptionChannel::Unknown(channel) => channel.clone(),
         }
     }
 
     /// Parse subscription channel from string
-    pub fn from_string(s: &str) -> Option<Self> {
+    ///
+    /// Returns the appropriate `SubscriptionChannel` variant for recognized channel patterns,
+    /// or `Unknown(String)` for unrecognized patterns.
+    #[must_use]
+    pub fn from_string(s: &str) -> Self {
         let parts: Vec<&str> = s.split('.').collect();
         match parts.as_slice() {
-            ["ticker", instrument] => Some(SubscriptionChannel::Ticker(instrument.to_string())),
-            ["book", instrument, "raw"] => {
-                Some(SubscriptionChannel::OrderBook(instrument.to_string()))
+            ["ticker", instrument] => SubscriptionChannel::Ticker(instrument.to_string()),
+            ["ticker", instrument, _interval] => {
+                SubscriptionChannel::Ticker(instrument.to_string())
             }
-            ["trades", instrument, "raw"] => {
-                Some(SubscriptionChannel::Trades(instrument.to_string()))
+            ["book", instrument, "raw"] => SubscriptionChannel::OrderBook(instrument.to_string()),
+            ["book", instrument, _depth, _interval] => {
+                SubscriptionChannel::OrderBook(instrument.to_string())
             }
-            ["chart", "trades", instrument, resolution] => Some(SubscriptionChannel::ChartTrades {
+            ["trades", instrument, "raw"] => SubscriptionChannel::Trades(instrument.to_string()),
+            ["trades", instrument, _interval] => {
+                SubscriptionChannel::Trades(instrument.to_string())
+            }
+            ["chart", "trades", instrument, resolution] => SubscriptionChannel::ChartTrades {
                 instrument: instrument.to_string(),
                 resolution: resolution.to_string(),
-            }),
-            ["user", "orders", "any", "any", "raw"] => Some(SubscriptionChannel::UserOrders),
-            ["user", "trades", "any", "any", "raw"] => Some(SubscriptionChannel::UserTrades),
-            ["user", "portfolio", "any"] => Some(SubscriptionChannel::UserPortfolio),
-            ["user", "changes", instrument, interval] => Some(SubscriptionChannel::UserChanges {
+            },
+            ["user", "orders", ..] => SubscriptionChannel::UserOrders,
+            ["user", "trades", ..] => SubscriptionChannel::UserTrades,
+            ["user", "portfolio", ..] => SubscriptionChannel::UserPortfolio,
+            ["user", "changes", instrument, interval] => SubscriptionChannel::UserChanges {
                 instrument: instrument.to_string(),
                 interval: interval.to_string(),
-            }),
-            ["deribit_price_index", currency_pair] => currency_pair
-                .strip_suffix("_usd")
-                .map(|currency| SubscriptionChannel::PriceIndex(currency.to_uppercase())),
-            ["estimated_expiration_price", instrument] => Some(
-                SubscriptionChannel::EstimatedExpirationPrice(instrument.to_string()),
-            ),
+            },
+            ["deribit_price_index", currency_pair] => {
+                let currency = currency_pair
+                    .strip_suffix("_usd")
+                    .map(|c| c.to_uppercase())
+                    .unwrap_or_else(|| currency_pair.to_uppercase());
+                SubscriptionChannel::PriceIndex(currency)
+            }
+            ["estimated_expiration_price", instrument] => {
+                SubscriptionChannel::EstimatedExpirationPrice(instrument.to_string())
+            }
             ["markprice", "options", instrument] => {
-                Some(SubscriptionChannel::MarkPrice(instrument.to_string()))
+                SubscriptionChannel::MarkPrice(instrument.to_string())
             }
             ["perpetual", instrument, "raw"] => {
-                Some(SubscriptionChannel::Perpetual(instrument.to_string()))
+                SubscriptionChannel::Perpetual(instrument.to_string())
             }
-            ["quote", instrument] => Some(SubscriptionChannel::Quote(instrument.to_string())),
-            _ => None,
+            ["quote", instrument] => SubscriptionChannel::Quote(instrument.to_string()),
+            _ => SubscriptionChannel::Unknown(s.to_string()),
         }
+    }
+
+    /// Check if this channel is unknown/unrecognized
+    #[must_use]
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, SubscriptionChannel::Unknown(_))
     }
 }
 
