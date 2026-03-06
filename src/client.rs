@@ -653,26 +653,29 @@ impl DeribitWebSocketClient {
 
     // Helper methods
 
+    /// Parse a channel string into a `SubscriptionChannel` variant
+    ///
+    /// Uses `SubscriptionChannel::from_string()` to properly detect all channel types.
+    /// Unknown channels are returned as `SubscriptionChannel::Unknown(String)`.
     fn parse_channel_type(&self, channel: &str) -> SubscriptionChannel {
-        if channel.starts_with("ticker") {
-            SubscriptionChannel::Ticker(self.extract_instrument(channel).unwrap_or_default())
-        } else if channel.starts_with("book") {
-            SubscriptionChannel::OrderBook(self.extract_instrument(channel).unwrap_or_default())
-        } else if channel.starts_with("trades") {
-            SubscriptionChannel::Trades(self.extract_instrument(channel).unwrap_or_default())
-        } else if channel == "user.orders" {
-            SubscriptionChannel::UserOrders
-        } else if channel == "user.trades" {
-            SubscriptionChannel::UserTrades
-        } else {
-            SubscriptionChannel::Ticker(String::new()) // Default fallback
-        }
+        SubscriptionChannel::from_string(channel)
     }
 
     fn extract_instrument(&self, channel: &str) -> Option<String> {
-        channel
-            .find('.')
-            .map(|dot_pos| channel[dot_pos + 1..].to_string())
+        let parts: Vec<&str> = channel.split('.').collect();
+        match parts.as_slice() {
+            ["ticker", instrument] | ["ticker", instrument, _] => Some(instrument.to_string()),
+            ["book", instrument, ..] => Some(instrument.to_string()),
+            ["trades", instrument, ..] => Some(instrument.to_string()),
+            ["chart", "trades", instrument, _] => Some(instrument.to_string()),
+            ["user", "changes", instrument, _] => Some(instrument.to_string()),
+            ["estimated_expiration_price", instrument] => Some(instrument.to_string()),
+            ["markprice", "options", instrument] => Some(instrument.to_string()),
+            ["perpetual", instrument, _] => Some(instrument.to_string()),
+            ["quote", instrument] => Some(instrument.to_string()),
+            ["deribit_price_index", currency] => Some(currency.to_string()),
+            _ => None,
+        }
     }
 }
 
