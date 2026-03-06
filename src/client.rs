@@ -744,6 +744,96 @@ impl DeribitWebSocketClient {
         }
     }
 
+    // Position management methods
+
+    /// Close an existing position
+    ///
+    /// Places a reduce-only order to close an existing position.
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument_name` - The instrument to close position for
+    /// * `order_type` - Order type: "limit" or "market"
+    /// * `price` - Price for limit orders (required if order_type is "limit")
+    ///
+    /// # Returns
+    ///
+    /// Response containing the order and any trades executed
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be parsed
+    pub async fn close_position(
+        &self,
+        instrument_name: &str,
+        order_type: &str,
+        price: Option<f64>,
+    ) -> Result<crate::model::ClosePositionResponse, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_close_position_request(instrument_name, order_type, price)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "Failed to parse close position response: {}",
+                    e
+                ))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Move positions between subaccounts
+    ///
+    /// Transfers positions from one subaccount to another within the same main account.
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - Currency for the positions (BTC, ETH, etc.)
+    /// * `source_uid` - Source subaccount ID
+    /// * `target_uid` - Target subaccount ID
+    /// * `trades` - List of positions to move
+    ///
+    /// # Returns
+    ///
+    /// A vector of results for each position moved
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be parsed
+    pub async fn move_positions(
+        &self,
+        currency: &str,
+        source_uid: u64,
+        target_uid: u64,
+        trades: &[crate::model::MovePositionTrade],
+    ) -> Result<Vec<crate::model::MovePositionResult>, WebSocketError> {
+        let json_request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_move_positions_request(currency, source_uid, target_uid, trades)
+        };
+
+        let response = self.send_request(json_request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "Failed to parse move positions response: {}",
+                    e
+                ))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
     /// Set message handler with callbacks
     /// The message_callback processes each incoming message and returns Result<(), Error>
     /// The error_callback is called only when message_callback returns an error
