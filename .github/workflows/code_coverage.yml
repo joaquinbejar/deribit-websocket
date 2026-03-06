@@ -36,10 +36,9 @@ jobs:
       - name: Generate code coverage report
         run: |
           cargo tarpaulin \
-            --all-features \
+            --lib \
             --timeout 180 \
-            --out Xml \
-            --exclude-files "tests/integration/*"
+            --out Xml
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
