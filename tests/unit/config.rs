@@ -88,3 +88,82 @@ fn test_config_debug() {
     assert!(debug_str.contains("ws_url"));
     assert!(debug_str.contains("heartbeat_interval"));
 }
+
+#[test]
+fn test_config_with_connection_timeout() {
+    let config = WebSocketConfig::default().with_connection_timeout(Duration::from_secs(120));
+
+    assert_eq!(config.connection_timeout, Duration::from_secs(120));
+}
+
+#[test]
+fn test_config_with_credentials() {
+    let config = WebSocketConfig::default()
+        .with_credentials("client_id".to_string(), "client_secret".to_string());
+
+    assert_eq!(config.client_id, Some("client_id".to_string()));
+    assert_eq!(config.client_secret, Some("client_secret".to_string()));
+}
+
+#[test]
+fn test_config_with_client_id() {
+    let config = WebSocketConfig::default().with_client_id("my_client_id".to_string());
+
+    assert_eq!(config.client_id, Some("my_client_id".to_string()));
+}
+
+#[test]
+fn test_config_with_client_secret() {
+    let config = WebSocketConfig::default().with_client_secret("my_secret".to_string());
+
+    assert_eq!(config.client_secret, Some("my_secret".to_string()));
+}
+
+#[test]
+fn test_config_with_logging() {
+    let config = WebSocketConfig::default().with_logging(true);
+
+    assert!(config.enable_logging);
+}
+
+#[test]
+fn test_config_with_logging_disabled() {
+    let config = WebSocketConfig::default().with_logging(false);
+
+    assert!(!config.enable_logging);
+}
+
+#[test]
+fn test_config_with_log_level() {
+    let config = WebSocketConfig::default().with_log_level("debug".to_string());
+
+    assert_eq!(config.log_level, "debug");
+}
+
+#[test]
+fn test_config_with_test_mode() {
+    let config = WebSocketConfig::default().with_test_mode(true);
+
+    assert!(config.test_mode);
+}
+
+#[test]
+fn test_config_has_credentials_true() {
+    let config = WebSocketConfig::default()
+        .with_credentials("client_id".to_string(), "client_secret".to_string());
+
+    assert!(config.has_credentials());
+}
+
+#[test]
+fn test_config_get_credentials_some() {
+    let config = WebSocketConfig::default()
+        .with_credentials("client_id".to_string(), "client_secret".to_string());
+
+    let creds = config.get_credentials();
+    assert!(creds.is_some());
+
+    let (id, secret) = creds.unwrap();
+    assert_eq!(id, "client_id");
+    assert_eq!(secret, "client_secret");
+}
