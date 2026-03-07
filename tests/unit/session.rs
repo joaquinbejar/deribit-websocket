@@ -61,8 +61,8 @@ fn test_websocket_session_debug_format() {
 
 #[test]
 fn test_websocket_session_config_access() {
-    let config = WebSocketConfig::default()
-        .with_heartbeat_interval(std::time::Duration::from_secs(45));
+    let config =
+        WebSocketConfig::default().with_heartbeat_interval(std::time::Duration::from_secs(45));
 
     let session = WebSocketSession::new(config);
 

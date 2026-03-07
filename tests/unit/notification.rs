@@ -11,7 +11,7 @@ fn test_notification_handler_new() {
 
 #[test]
 fn test_notification_handler_default() {
-    let handler = NotificationHandler::default();
+    let handler = NotificationHandler;
     assert!(format!("{:?}", handler).contains("NotificationHandler"));
 }
 
@@ -25,7 +25,7 @@ fn test_notification_handler_clone() {
 #[test]
 fn test_parse_notification_valid() {
     let handler = NotificationHandler::new();
-    
+
     let json = r#"{
         "jsonrpc": "2.0",
         "method": "subscription",
@@ -34,10 +34,10 @@ fn test_parse_notification_valid() {
             "data": {"price": 50000}
         }
     }"#;
-    
+
     let result = handler.parse_notification(json);
     assert!(result.is_ok());
-    
+
     let notification = result.unwrap();
     assert_eq!(notification.method, "subscription");
 }
@@ -45,9 +45,9 @@ fn test_parse_notification_valid() {
 #[test]
 fn test_parse_notification_invalid() {
     let handler = NotificationHandler::new();
-    
+
     let json = r#"not valid json"#;
-    
+
     let result = handler.parse_notification(json);
     assert!(result.is_err());
 }
@@ -55,42 +55,45 @@ fn test_parse_notification_invalid() {
 #[test]
 fn test_is_subscription_notification_true() {
     let handler = NotificationHandler::new();
-    
+
     let notification = JsonRpcNotification {
         jsonrpc: "2.0".to_string(),
         method: "subscription".to_string(),
         params: None,
     };
-    
+
     assert!(handler.is_subscription_notification(&notification));
 }
 
 #[test]
 fn test_is_subscription_notification_false() {
     let handler = NotificationHandler::new();
-    
+
     let notification = JsonRpcNotification {
         jsonrpc: "2.0".to_string(),
         method: "heartbeat".to_string(),
         params: None,
     };
-    
+
     assert!(!handler.is_subscription_notification(&notification));
 }
 
 #[test]
 fn test_extract_channel_with_channel() {
     let handler = NotificationHandler::new();
-    
+
     let mut params = serde_json::Map::new();
-    params.insert("channel".to_string(), serde_json::json!("ticker.BTC-PERPETUAL"));
-    
+    params.insert(
+        "channel".to_string(),
+        serde_json::json!("ticker.BTC-PERPETUAL"),
+    );
+
     let notification = JsonRpcNotification {
         jsonrpc: "2.0".to_string(),
         method: "subscription".to_string(),
         params: Some(serde_json::Value::Object(params)),
     };
-    
+
     let channel = handler.extract_channel(&notification);
     assert_eq!(channel, Some("ticker.BTC-PERPETUAL".to_string()));
 }
@@ -98,13 +101,13 @@ fn test_extract_channel_with_channel() {
 #[test]
 fn test_extract_channel_no_params() {
     let handler = NotificationHandler::new();
-    
+
     let notification = JsonRpcNotification {
         jsonrpc: "2.0".to_string(),
         method: "subscription".to_string(),
         params: None,
     };
-    
+
     let channel = handler.extract_channel(&notification);
     assert!(channel.is_none());
 }
@@ -112,16 +115,16 @@ fn test_extract_channel_no_params() {
 #[test]
 fn test_extract_channel_no_channel_field() {
     let handler = NotificationHandler::new();
-    
+
     let mut params = serde_json::Map::new();
     params.insert("data".to_string(), serde_json::json!({"price": 50000}));
-    
+
     let notification = JsonRpcNotification {
         jsonrpc: "2.0".to_string(),
         method: "subscription".to_string(),
         params: Some(serde_json::Value::Object(params)),
     };
-    
+
     let channel = handler.extract_channel(&notification);
     assert!(channel.is_none());
 }
@@ -129,16 +132,16 @@ fn test_extract_channel_no_channel_field() {
 #[test]
 fn test_extract_data_with_data() {
     let handler = NotificationHandler::new();
-    
+
     let mut params = serde_json::Map::new();
     params.insert("data".to_string(), serde_json::json!({"price": 50000}));
-    
+
     let notification = JsonRpcNotification {
         jsonrpc: "2.0".to_string(),
         method: "subscription".to_string(),
         params: Some(serde_json::Value::Object(params)),
     };
-    
+
     let data = handler.extract_data(&notification);
     assert!(data.is_some());
     assert_eq!(data.unwrap()["price"], 50000);
@@ -147,13 +150,13 @@ fn test_extract_data_with_data() {
 #[test]
 fn test_extract_data_no_params() {
     let handler = NotificationHandler::new();
-    
+
     let notification = JsonRpcNotification {
         jsonrpc: "2.0".to_string(),
         method: "subscription".to_string(),
         params: None,
     };
-    
+
     let data = handler.extract_data(&notification);
     assert!(data.is_none());
 }
@@ -161,16 +164,19 @@ fn test_extract_data_no_params() {
 #[test]
 fn test_extract_data_no_data_field() {
     let handler = NotificationHandler::new();
-    
+
     let mut params = serde_json::Map::new();
-    params.insert("channel".to_string(), serde_json::json!("ticker.BTC-PERPETUAL"));
-    
+    params.insert(
+        "channel".to_string(),
+        serde_json::json!("ticker.BTC-PERPETUAL"),
+    );
+
     let notification = JsonRpcNotification {
         jsonrpc: "2.0".to_string(),
         method: "subscription".to_string(),
         params: Some(serde_json::Value::Object(params)),
     };
-    
+
     let data = handler.extract_data(&notification);
     assert!(data.is_none());
 }

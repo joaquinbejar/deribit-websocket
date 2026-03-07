@@ -40,16 +40,16 @@ fn test_message_builder_notification_handler() {
 #[test]
 fn test_parse_message_response() {
     let builder = MessageBuilder::new();
-    
+
     let response_json = r#"{
         "jsonrpc": "2.0",
         "id": 1,
         "result": {"version": "1.2.26"}
     }"#;
-    
+
     let result = builder.parse_message(response_json);
     assert!(result.is_ok());
-    
+
     if let Ok(MessageType::Response(response)) = result {
         assert_eq!(response.id.as_u64().unwrap(), 1);
     } else {
@@ -60,7 +60,7 @@ fn test_parse_message_response() {
 #[test]
 fn test_parse_message_notification() {
     let builder = MessageBuilder::new();
-    
+
     let notification_json = r#"{
         "jsonrpc": "2.0",
         "method": "subscription",
@@ -69,10 +69,10 @@ fn test_parse_message_notification() {
             "data": {"price": 50000}
         }
     }"#;
-    
+
     let result = builder.parse_message(notification_json);
     assert!(result.is_ok());
-    
+
     if let Ok(MessageType::Notification(notification)) = result {
         assert_eq!(notification.method, "subscription");
     } else {
@@ -83,9 +83,9 @@ fn test_parse_message_notification() {
 #[test]
 fn test_parse_message_invalid() {
     let builder = MessageBuilder::new();
-    
+
     let invalid_json = r#"not valid json"#;
-    
+
     let result = builder.parse_message(invalid_json);
     assert!(result.is_err());
 }
@@ -93,13 +93,13 @@ fn test_parse_message_invalid() {
 #[test]
 fn test_message_type_debug() {
     let builder = MessageBuilder::new();
-    
+
     let response_json = r#"{
         "jsonrpc": "2.0",
         "id": 1,
         "result": {"version": "1.2.26"}
     }"#;
-    
+
     if let Ok(msg_type) = builder.parse_message(response_json) {
         let debug_str = format!("{:?}", msg_type);
         assert!(debug_str.contains("Response"));
@@ -109,13 +109,13 @@ fn test_message_type_debug() {
 #[test]
 fn test_message_type_clone() {
     let builder = MessageBuilder::new();
-    
+
     let response_json = r#"{
         "jsonrpc": "2.0",
         "id": 1,
         "result": {"version": "1.2.26"}
     }"#;
-    
+
     if let Ok(msg_type) = builder.parse_message(response_json) {
         let cloned = msg_type.clone();
         assert!(format!("{:?}", cloned).contains("Response"));

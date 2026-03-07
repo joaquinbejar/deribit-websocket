@@ -91,8 +91,7 @@ fn test_config_debug() {
 
 #[test]
 fn test_config_with_connection_timeout() {
-    let config = WebSocketConfig::default()
-        .with_connection_timeout(Duration::from_secs(120));
+    let config = WebSocketConfig::default().with_connection_timeout(Duration::from_secs(120));
 
     assert_eq!(config.connection_timeout, Duration::from_secs(120));
 }
@@ -108,48 +107,42 @@ fn test_config_with_credentials() {
 
 #[test]
 fn test_config_with_client_id() {
-    let config = WebSocketConfig::default()
-        .with_client_id("my_client_id".to_string());
+    let config = WebSocketConfig::default().with_client_id("my_client_id".to_string());
 
     assert_eq!(config.client_id, Some("my_client_id".to_string()));
 }
 
 #[test]
 fn test_config_with_client_secret() {
-    let config = WebSocketConfig::default()
-        .with_client_secret("my_secret".to_string());
+    let config = WebSocketConfig::default().with_client_secret("my_secret".to_string());
 
     assert_eq!(config.client_secret, Some("my_secret".to_string()));
 }
 
 #[test]
 fn test_config_with_logging() {
-    let config = WebSocketConfig::default()
-        .with_logging(true);
+    let config = WebSocketConfig::default().with_logging(true);
 
     assert!(config.enable_logging);
 }
 
 #[test]
 fn test_config_with_logging_disabled() {
-    let config = WebSocketConfig::default()
-        .with_logging(false);
+    let config = WebSocketConfig::default().with_logging(false);
 
     assert!(!config.enable_logging);
 }
 
 #[test]
 fn test_config_with_log_level() {
-    let config = WebSocketConfig::default()
-        .with_log_level("debug".to_string());
+    let config = WebSocketConfig::default().with_log_level("debug".to_string());
 
     assert_eq!(config.log_level, "debug");
 }
 
 #[test]
 fn test_config_with_test_mode() {
-    let config = WebSocketConfig::default()
-        .with_test_mode(true);
+    let config = WebSocketConfig::default().with_test_mode(true);
 
     assert!(config.test_mode);
 }

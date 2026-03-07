@@ -11,7 +11,7 @@ fn test_response_handler_new() {
 
 #[test]
 fn test_response_handler_default() {
-    let handler = ResponseHandler::default();
+    let handler = ResponseHandler;
     assert!(format!("{:?}", handler).contains("ResponseHandler"));
 }
 
@@ -25,16 +25,16 @@ fn test_response_handler_clone() {
 #[test]
 fn test_parse_response_success() {
     let handler = ResponseHandler::new();
-    
+
     let json = r#"{
         "jsonrpc": "2.0",
         "id": 1,
         "result": {"version": "1.2.26"}
     }"#;
-    
+
     let result = handler.parse_response(json);
     assert!(result.is_ok());
-    
+
     let response = result.unwrap();
     assert_eq!(response.id.as_u64().unwrap(), 1);
 }
@@ -42,7 +42,7 @@ fn test_parse_response_success() {
 #[test]
 fn test_parse_response_error() {
     let handler = ResponseHandler::new();
-    
+
     let json = r#"{
         "jsonrpc": "2.0",
         "id": 1,
@@ -51,7 +51,7 @@ fn test_parse_response_error() {
             "message": "Invalid Request"
         }
     }"#;
-    
+
     let result = handler.parse_response(json);
     assert!(result.is_ok());
 }
@@ -59,9 +59,9 @@ fn test_parse_response_error() {
 #[test]
 fn test_parse_response_invalid() {
     let handler = ResponseHandler::new();
-    
+
     let json = r#"not valid json"#;
-    
+
     let result = handler.parse_response(json);
     assert!(result.is_err());
 }
@@ -69,7 +69,7 @@ fn test_parse_response_invalid() {
 #[test]
 fn test_is_success_true() {
     let handler = ResponseHandler::new();
-    
+
     let response = JsonRpcResponse {
         jsonrpc: "2.0".to_string(),
         id: serde_json::json!(1),
@@ -77,14 +77,14 @@ fn test_is_success_true() {
             result: serde_json::json!({"version": "1.2.26"}),
         },
     };
-    
+
     assert!(handler.is_success(&response));
 }
 
 #[test]
 fn test_is_success_false() {
     let handler = ResponseHandler::new();
-    
+
     let response = JsonRpcResponse {
         jsonrpc: "2.0".to_string(),
         id: serde_json::json!(1),
@@ -96,14 +96,14 @@ fn test_is_success_false() {
             },
         },
     };
-    
+
     assert!(!handler.is_success(&response));
 }
 
 #[test]
 fn test_extract_result_success() {
     let handler = ResponseHandler::new();
-    
+
     let response = JsonRpcResponse {
         jsonrpc: "2.0".to_string(),
         id: serde_json::json!(1),
@@ -111,7 +111,7 @@ fn test_extract_result_success() {
             result: serde_json::json!({"version": "1.2.26"}),
         },
     };
-    
+
     let result = handler.extract_result(&response);
     assert!(result.is_some());
     assert_eq!(result.unwrap()["version"], "1.2.26");
@@ -120,7 +120,7 @@ fn test_extract_result_success() {
 #[test]
 fn test_extract_result_error() {
     let handler = ResponseHandler::new();
-    
+
     let response = JsonRpcResponse {
         jsonrpc: "2.0".to_string(),
         id: serde_json::json!(1),
@@ -132,7 +132,7 @@ fn test_extract_result_error() {
             },
         },
     };
-    
+
     let result = handler.extract_result(&response);
     assert!(result.is_none());
 }
@@ -140,7 +140,7 @@ fn test_extract_result_error() {
 #[test]
 fn test_extract_error_success() {
     let handler = ResponseHandler::new();
-    
+
     let response = JsonRpcResponse {
         jsonrpc: "2.0".to_string(),
         id: serde_json::json!(1),
@@ -148,7 +148,7 @@ fn test_extract_error_success() {
             result: serde_json::json!({"version": "1.2.26"}),
         },
     };
-    
+
     let error = handler.extract_error(&response);
     assert!(error.is_none());
 }
@@ -156,7 +156,7 @@ fn test_extract_error_success() {
 #[test]
 fn test_extract_error_error() {
     let handler = ResponseHandler::new();
-    
+
     let response = JsonRpcResponse {
         jsonrpc: "2.0".to_string(),
         id: serde_json::json!(1),
@@ -168,7 +168,7 @@ fn test_extract_error_error() {
             },
         },
     };
-    
+
     let error = handler.extract_error(&response);
     assert!(error.is_some());
     assert_eq!(error.unwrap().code, -32600);
