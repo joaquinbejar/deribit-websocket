@@ -97,7 +97,69 @@ impl RequestBuilder {
 
     /// Build test request
     pub fn build_test_request(&mut self) -> JsonRpcRequest {
-        self.build_request("public/test", None)
+        self.build_request(crate::constants::methods::PUBLIC_TEST, None)
+    }
+
+    /// Build set_heartbeat request
+    ///
+    /// Enables heartbeat with specified interval. The server will send a heartbeat
+    /// message every `interval` seconds, and expects a response within the same interval.
+    ///
+    /// # Arguments
+    ///
+    /// * `interval` - Heartbeat interval in seconds (10-3600)
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for setting the heartbeat interval
+    pub fn build_set_heartbeat_request(&mut self, interval: u64) -> JsonRpcRequest {
+        let params = serde_json::json!({
+            "interval": interval
+        });
+        self.build_request(
+            crate::constants::methods::PUBLIC_SET_HEARTBEAT,
+            Some(params),
+        )
+    }
+
+    /// Build disable_heartbeat request
+    ///
+    /// Disables heartbeat messages. The server will stop sending heartbeat messages
+    /// and test_request notifications.
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for disabling heartbeats
+    pub fn build_disable_heartbeat_request(&mut self) -> JsonRpcRequest {
+        self.build_request(
+            crate::constants::methods::PUBLIC_DISABLE_HEARTBEAT,
+            Some(serde_json::json!({})),
+        )
+    }
+
+    /// Build hello request
+    ///
+    /// Sends client identification to the server. This is used for client tracking
+    /// and debugging purposes.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_name` - Name of the client application
+    /// * `client_version` - Version of the client application
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for client identification
+    pub fn build_hello_request(
+        &mut self,
+        client_name: &str,
+        client_version: &str,
+    ) -> JsonRpcRequest {
+        let params = serde_json::json!({
+            "client_name": client_name,
+            "client_version": client_version
+        });
+        self.build_request(crate::constants::methods::PUBLIC_HELLO, Some(params))
     }
 
     /// Build get time request

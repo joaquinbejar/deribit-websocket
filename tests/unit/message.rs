@@ -147,3 +147,125 @@ fn test_request_with_empty_channels() {
         assert_eq!(channels_array.len(), 0);
     }
 }
+
+// =============================================================================
+// Session management request tests (Issue #14)
+// =============================================================================
+
+#[test]
+fn test_request_builder_set_heartbeat() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_set_heartbeat_request(30);
+
+    assert_eq!(request.method, "public/set_heartbeat");
+    assert_eq!(request.jsonrpc, "2.0");
+    assert!(request.id.is_number());
+
+    if let Some(params) = request.params {
+        let params_obj = params.as_object().unwrap();
+        assert_eq!(params_obj["interval"], 30);
+    } else {
+        panic!("set_heartbeat request should have params");
+    }
+}
+
+#[test]
+fn test_request_builder_set_heartbeat_custom_interval() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_set_heartbeat_request(60);
+
+    if let Some(params) = request.params {
+        let params_obj = params.as_object().unwrap();
+        assert_eq!(params_obj["interval"], 60);
+    } else {
+        panic!("set_heartbeat request should have params");
+    }
+}
+
+#[test]
+fn test_request_builder_disable_heartbeat() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_disable_heartbeat_request();
+
+    assert_eq!(request.method, "public/disable_heartbeat");
+    assert_eq!(request.jsonrpc, "2.0");
+    assert!(request.id.is_number());
+    assert!(request.params.is_some());
+}
+
+#[test]
+fn test_request_builder_hello() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_hello_request("test-client", "1.0.0");
+
+    assert_eq!(request.method, "public/hello");
+    assert_eq!(request.jsonrpc, "2.0");
+    assert!(request.id.is_number());
+
+    if let Some(params) = request.params {
+        let params_obj = params.as_object().unwrap();
+        assert_eq!(params_obj["client_name"], "test-client");
+        assert_eq!(params_obj["client_version"], "1.0.0");
+    } else {
+        panic!("hello request should have params");
+    }
+}
+
+#[test]
+fn test_request_builder_hello_custom_values() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_hello_request("deribit-websocket", "0.2.0");
+
+    if let Some(params) = request.params {
+        let params_obj = params.as_object().unwrap();
+        assert_eq!(params_obj["client_name"], "deribit-websocket");
+        assert_eq!(params_obj["client_version"], "0.2.0");
+    } else {
+        panic!("hello request should have params");
+    }
+}
+
+#[test]
+fn test_request_builder_set_heartbeat_serialization() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_set_heartbeat_request(30);
+
+    let serialized = serde_json::to_string(&request).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+    assert_eq!(parsed["jsonrpc"], "2.0");
+    assert_eq!(parsed["method"], "public/set_heartbeat");
+    assert!(parsed["id"].is_number());
+    assert_eq!(parsed["params"]["interval"], 30);
+}
+
+#[test]
+fn test_request_builder_hello_serialization() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_hello_request("my-app", "2.0.0");
+
+    let serialized = serde_json::to_string(&request).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+    assert_eq!(parsed["jsonrpc"], "2.0");
+    assert_eq!(parsed["method"], "public/hello");
+    assert!(parsed["id"].is_number());
+    assert_eq!(parsed["params"]["client_name"], "my-app");
+    assert_eq!(parsed["params"]["client_version"], "2.0.0");
+}
+
+#[test]
+fn test_request_builder_incremental_ids_session_methods() {
+    let mut builder = RequestBuilder::new();
+
+    let req1 = builder.build_set_heartbeat_request(30);
+    let req2 = builder.build_disable_heartbeat_request();
+    let req3 = builder.build_hello_request("test", "1.0");
+
+    let id1 = req1.id.as_u64().unwrap();
+    let id2 = req2.id.as_u64().unwrap();
+    let id3 = req3.id.as_u64().unwrap();
+
+    assert_eq!(id2, id1 + 1);
+    assert_eq!(id3, id2 + 1);
+}

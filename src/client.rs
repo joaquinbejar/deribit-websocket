@@ -307,6 +307,108 @@ impl DeribitWebSocketClient {
         self.send_request(request).await
     }
 
+    /// Enable heartbeat with specified interval
+    ///
+    /// The server will send a heartbeat message every `interval` seconds.
+    /// If heartbeat is enabled, the server will also send `test_request` notifications
+    /// which the client should respond to with `public/test` to keep the connection alive.
+    ///
+    /// # Arguments
+    ///
+    /// * `interval` - Heartbeat interval in seconds (10-3600)
+    ///
+    /// # Returns
+    ///
+    /// Returns `"ok"` on success
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the interval is invalid
+    pub async fn set_heartbeat(&self, interval: u64) -> Result<String, WebSocketError> {
+        let request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_set_heartbeat_request(interval)
+        };
+
+        let response = self.send_request(request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => {
+                result.as_str().map(String::from).ok_or_else(|| {
+                    WebSocketError::InvalidMessage(
+                        "Expected string result from set_heartbeat".to_string(),
+                    )
+                })
+            }
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Disable heartbeat
+    ///
+    /// Stops the server from sending heartbeat messages and `test_request` notifications.
+    ///
+    /// # Returns
+    ///
+    /// Returns `"ok"` on success
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails
+    pub async fn disable_heartbeat(&self) -> Result<String, WebSocketError> {
+        let request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_disable_heartbeat_request()
+        };
+
+        let response = self.send_request(request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => {
+                result.as_str().map(String::from).ok_or_else(|| {
+                    WebSocketError::InvalidMessage(
+                        "Expected string result from disable_heartbeat".to_string(),
+                    )
+                })
+            }
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Send client identification to the server
+    ///
+    /// This method identifies the client to the server with its name and version.
+    /// It's recommended to call this after connecting to provide debugging information.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_name` - Name of the client application
+    /// * `client_version` - Version of the client application
+    ///
+    /// # Returns
+    ///
+    /// Returns a JSON response containing the API version information
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails
+    pub async fn hello(
+        &self,
+        client_name: &str,
+        client_version: &str,
+    ) -> Result<JsonRpcResponse, WebSocketError> {
+        let request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_hello_request(client_name, client_version)
+        };
+
+        self.send_request(request).await
+    }
+
     /// Place mass quotes
     pub async fn mass_quote(
         &self,
