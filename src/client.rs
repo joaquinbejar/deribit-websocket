@@ -1010,9 +1010,12 @@ impl DeribitWebSocketClient {
             ["instrument", "state", _kind, currency] => Some(currency.to_string()),
             ["block_rfq", "trades", currency] => Some(currency.to_string()),
             ["block_trade_confirmations", currency] => Some(currency.to_string()),
+            ["user", "mmp_trigger", index_name] => Some(index_name.to_string()),
             ["platform_state"]
             | ["platform_state", "public_methods_state"]
-            | ["block_trade_confirmations"] => None,
+            | ["block_trade_confirmations"]
+            | ["user", "access_log"]
+            | ["user", "lock"] => None,
             _ => None,
         }
     }
