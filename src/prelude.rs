@@ -37,6 +37,11 @@ pub use crate::model::{
         EditOrderRequest, OrderInfo, OrderRequest, OrderResponse, OrderType, TimeInForce,
         TradeExecution, Trigger,
     },
+    ws_types::{
+        AuthResponse, ConnectionState, HeartbeatStatus, HelloResponse, JsonRpcError,
+        JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, JsonRpcResult, TestResponse,
+        WebSocketMessage,
+    },
 };
 
 // Session management
