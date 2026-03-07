@@ -200,6 +200,12 @@ pub enum SubscriptionChannel {
     BlockTradeConfirmations,
     /// Block trade confirmations for a specific currency
     BlockTradeConfirmationsByCurrency(String),
+    /// User MMP (Market Maker Protection) trigger for a specific index
+    UserMmpTrigger(String),
+    /// User API access log
+    UserAccessLog,
+    /// User account lock status
+    UserLock,
     /// Unknown or unrecognized channel
     Unknown(String),
 }
@@ -353,6 +359,11 @@ impl SubscriptionChannel {
             SubscriptionChannel::BlockTradeConfirmationsByCurrency(currency) => {
                 format!("block_trade_confirmations.{}", currency)
             }
+            SubscriptionChannel::UserMmpTrigger(index_name) => {
+                format!("user.mmp_trigger.{}", index_name)
+            }
+            SubscriptionChannel::UserAccessLog => "user.access_log".to_string(),
+            SubscriptionChannel::UserLock => "user.lock".to_string(),
             SubscriptionChannel::Unknown(channel) => channel.clone(),
         }
     }
@@ -446,6 +457,11 @@ impl SubscriptionChannel {
             ["block_trade_confirmations", currency] => {
                 SubscriptionChannel::BlockTradeConfirmationsByCurrency(currency.to_string())
             }
+            ["user", "mmp_trigger", index_name] => {
+                SubscriptionChannel::UserMmpTrigger(index_name.to_string())
+            }
+            ["user", "access_log"] => SubscriptionChannel::UserAccessLog,
+            ["user", "lock"] => SubscriptionChannel::UserLock,
             _ => SubscriptionChannel::Unknown(s.to_string()),
         }
     }

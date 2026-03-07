@@ -924,3 +924,131 @@ fn test_block_trade_confirmations_by_currency_roundtrip() {
     let parsed = SubscriptionChannel::from_string(&channel_name);
     assert_eq!(original, parsed);
 }
+
+// =============================================================================
+// Tests for private subscription channels (Issue #13)
+// =============================================================================
+
+// Test user.mmp_trigger channel parsing
+#[test]
+fn test_parse_channel_user_mmp_trigger() {
+    let channel = SubscriptionChannel::from_string("user.mmp_trigger.btc_usd");
+    assert!(
+        matches!(channel, SubscriptionChannel::UserMmpTrigger(ref index) if index == "btc_usd")
+    );
+}
+
+#[test]
+fn test_parse_channel_user_mmp_trigger_eth() {
+    let channel = SubscriptionChannel::from_string("user.mmp_trigger.eth_usd");
+    assert!(
+        matches!(channel, SubscriptionChannel::UserMmpTrigger(ref index) if index == "eth_usd")
+    );
+}
+
+// Test user.access_log channel parsing
+#[test]
+fn test_parse_channel_user_access_log() {
+    let channel = SubscriptionChannel::from_string("user.access_log");
+    assert!(matches!(channel, SubscriptionChannel::UserAccessLog));
+}
+
+// Test user.lock channel parsing
+#[test]
+fn test_parse_channel_user_lock() {
+    let channel = SubscriptionChannel::from_string("user.lock");
+    assert!(matches!(channel, SubscriptionChannel::UserLock));
+}
+
+// Test channel_name for private channels
+#[test]
+fn test_channel_name_user_mmp_trigger() {
+    let channel = SubscriptionChannel::UserMmpTrigger("btc_usd".to_string());
+    assert_eq!(channel.channel_name(), "user.mmp_trigger.btc_usd");
+}
+
+#[test]
+fn test_channel_name_user_mmp_trigger_eth() {
+    let channel = SubscriptionChannel::UserMmpTrigger("eth_usd".to_string());
+    assert_eq!(channel.channel_name(), "user.mmp_trigger.eth_usd");
+}
+
+#[test]
+fn test_channel_name_user_access_log() {
+    let channel = SubscriptionChannel::UserAccessLog;
+    assert_eq!(channel.channel_name(), "user.access_log");
+}
+
+#[test]
+fn test_channel_name_user_lock() {
+    let channel = SubscriptionChannel::UserLock;
+    assert_eq!(channel.channel_name(), "user.lock");
+}
+
+// Test is_unknown for private channels
+#[test]
+fn test_is_unknown_user_mmp_trigger() {
+    let channel = SubscriptionChannel::UserMmpTrigger("btc_usd".to_string());
+    assert!(!channel.is_unknown());
+}
+
+#[test]
+fn test_is_unknown_user_access_log() {
+    let channel = SubscriptionChannel::UserAccessLog;
+    assert!(!channel.is_unknown());
+}
+
+#[test]
+fn test_is_unknown_user_lock() {
+    let channel = SubscriptionChannel::UserLock;
+    assert!(!channel.is_unknown());
+}
+
+// Test equality for private channels
+#[test]
+fn test_user_mmp_trigger_equality() {
+    let channel1 = SubscriptionChannel::UserMmpTrigger("btc_usd".to_string());
+    let channel2 = SubscriptionChannel::UserMmpTrigger("btc_usd".to_string());
+    let channel3 = SubscriptionChannel::UserMmpTrigger("eth_usd".to_string());
+    assert_eq!(channel1, channel2);
+    assert_ne!(channel1, channel3);
+}
+
+#[test]
+fn test_user_access_log_equality() {
+    let channel1 = SubscriptionChannel::UserAccessLog;
+    let channel2 = SubscriptionChannel::UserAccessLog;
+    assert_eq!(channel1, channel2);
+}
+
+#[test]
+fn test_user_lock_equality() {
+    let channel1 = SubscriptionChannel::UserLock;
+    let channel2 = SubscriptionChannel::UserLock;
+    assert_eq!(channel1, channel2);
+}
+
+// Test roundtrip for private channels
+#[test]
+fn test_user_mmp_trigger_roundtrip() {
+    let original = SubscriptionChannel::UserMmpTrigger("btc_usd".to_string());
+    let channel_name = original.channel_name();
+    let parsed = SubscriptionChannel::from_string(&channel_name);
+    assert_eq!(original, parsed);
+}
+
+#[test]
+fn test_user_access_log_roundtrip() {
+    let original = SubscriptionChannel::UserAccessLog;
+    let channel_name = original.channel_name();
+    let parsed = SubscriptionChannel::from_string(&channel_name);
+    assert_eq!(original, parsed);
+}
+
+#[test]
+fn test_user_lock_roundtrip() {
+    let original = SubscriptionChannel::UserLock;
+    let channel_name = original.channel_name();
+    let parsed = SubscriptionChannel::from_string(&channel_name);
+    assert_eq!(original, parsed);
+}

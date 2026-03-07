@@ -126,4 +126,10 @@ pub mod channels {
     pub const BLOCK_RFQ_TRADES: &str = "block_rfq.trades";
     /// Block trade confirmations channel
     pub const BLOCK_TRADE_CONFIRMATIONS: &str = "block_trade_confirmations";
+    /// User MMP trigger channel
+    pub const USER_MMP_TRIGGER: &str = "user.mmp_trigger";
+    /// User access log channel
+    pub const USER_ACCESS_LOG: &str = "user.access_log";
+    /// User lock channel
+    pub const USER_LOCK: &str = "user.lock";
 }

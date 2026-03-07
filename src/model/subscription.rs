@@ -76,12 +76,15 @@ impl SubscriptionManager {
             | SubscriptionChannel::BlockTradeConfirmationsByCurrency(currency) => {
                 Some(currency.clone())
             }
+            SubscriptionChannel::UserMmpTrigger(index_name) => Some(index_name.clone()),
             SubscriptionChannel::UserOrders
             | SubscriptionChannel::UserTrades
             | SubscriptionChannel::UserPortfolio
             | SubscriptionChannel::PlatformState
             | SubscriptionChannel::PlatformStatePublicMethods
             | SubscriptionChannel::BlockTradeConfirmations
+            | SubscriptionChannel::UserAccessLog
+            | SubscriptionChannel::UserLock
             | SubscriptionChannel::Unknown(_) => None,
         };
         self.add_subscription(channel, channel_type, instrument);
