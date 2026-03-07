@@ -167,6 +167,51 @@ impl RequestBuilder {
         self.build_request("public/get_time", None)
     }
 
+    /// Build enable_cancel_on_disconnect request
+    ///
+    /// Enables automatic cancellation of all open orders when the WebSocket connection
+    /// is lost. This is a safety feature to prevent unintended order execution when
+    /// the client loses connectivity.
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for enabling cancel-on-disconnect
+    pub fn build_enable_cancel_on_disconnect_request(&mut self) -> JsonRpcRequest {
+        self.build_request(
+            crate::constants::methods::PRIVATE_ENABLE_CANCEL_ON_DISCONNECT,
+            Some(serde_json::json!({})),
+        )
+    }
+
+    /// Build disable_cancel_on_disconnect request
+    ///
+    /// Disables automatic cancellation of orders on disconnect. Orders will remain
+    /// active even if the WebSocket connection is lost.
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for disabling cancel-on-disconnect
+    pub fn build_disable_cancel_on_disconnect_request(&mut self) -> JsonRpcRequest {
+        self.build_request(
+            crate::constants::methods::PRIVATE_DISABLE_CANCEL_ON_DISCONNECT,
+            Some(serde_json::json!({})),
+        )
+    }
+
+    /// Build get_cancel_on_disconnect request
+    ///
+    /// Retrieves the current cancel-on-disconnect status for the session.
+    ///
+    /// # Returns
+    ///
+    /// A JSON-RPC request for getting the cancel-on-disconnect status
+    pub fn build_get_cancel_on_disconnect_request(&mut self) -> JsonRpcRequest {
+        self.build_request(
+            crate::constants::methods::PRIVATE_GET_CANCEL_ON_DISCONNECT,
+            Some(serde_json::json!({})),
+        )
+    }
+
     /// Build mass quote request
     pub fn build_mass_quote_request(&mut self, request: MassQuoteRequest) -> JsonRpcRequest {
         let params = serde_json::to_value(request).expect("Failed to serialize mass quote request");

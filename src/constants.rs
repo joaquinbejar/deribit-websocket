@@ -85,6 +85,14 @@ pub mod methods {
     /// Move positions between subaccounts
     pub const PRIVATE_MOVE_POSITIONS: &str = "private/move_positions";
 
+    // Cancel-on-disconnect
+    /// Enable cancel-on-disconnect
+    pub const PRIVATE_ENABLE_CANCEL_ON_DISCONNECT: &str = "private/enable_cancel_on_disconnect";
+    /// Disable cancel-on-disconnect
+    pub const PRIVATE_DISABLE_CANCEL_ON_DISCONNECT: &str = "private/disable_cancel_on_disconnect";
+    /// Get cancel-on-disconnect status
+    pub const PRIVATE_GET_CANCEL_ON_DISCONNECT: &str = "private/get_cancel_on_disconnect";
+
     // Test
     /// Test connection
     pub const PUBLIC_TEST: &str = "public/test";
