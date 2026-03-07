@@ -269,3 +269,95 @@ fn test_request_builder_incremental_ids_session_methods() {
     assert_eq!(id2, id1 + 1);
     assert_eq!(id3, id2 + 1);
 }
+
+// =============================================================================
+// Cancel-on-disconnect request tests (Issue #15)
+// =============================================================================
+
+#[test]
+fn test_request_builder_enable_cancel_on_disconnect() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_enable_cancel_on_disconnect_request();
+
+    assert_eq!(request.method, "private/enable_cancel_on_disconnect");
+    assert_eq!(request.jsonrpc, "2.0");
+    assert!(request.id.is_number());
+    assert!(request.params.is_some());
+}
+
+#[test]
+fn test_request_builder_disable_cancel_on_disconnect() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_disable_cancel_on_disconnect_request();
+
+    assert_eq!(request.method, "private/disable_cancel_on_disconnect");
+    assert_eq!(request.jsonrpc, "2.0");
+    assert!(request.id.is_number());
+    assert!(request.params.is_some());
+}
+
+#[test]
+fn test_request_builder_get_cancel_on_disconnect() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_get_cancel_on_disconnect_request();
+
+    assert_eq!(request.method, "private/get_cancel_on_disconnect");
+    assert_eq!(request.jsonrpc, "2.0");
+    assert!(request.id.is_number());
+    assert!(request.params.is_some());
+}
+
+#[test]
+fn test_request_builder_enable_cancel_on_disconnect_serialization() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_enable_cancel_on_disconnect_request();
+
+    let serialized = serde_json::to_string(&request).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+    assert_eq!(parsed["jsonrpc"], "2.0");
+    assert_eq!(parsed["method"], "private/enable_cancel_on_disconnect");
+    assert!(parsed["id"].is_number());
+}
+
+#[test]
+fn test_request_builder_disable_cancel_on_disconnect_serialization() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_disable_cancel_on_disconnect_request();
+
+    let serialized = serde_json::to_string(&request).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+    assert_eq!(parsed["jsonrpc"], "2.0");
+    assert_eq!(parsed["method"], "private/disable_cancel_on_disconnect");
+    assert!(parsed["id"].is_number());
+}
+
+#[test]
+fn test_request_builder_get_cancel_on_disconnect_serialization() {
+    let mut builder = RequestBuilder::new();
+    let request = builder.build_get_cancel_on_disconnect_request();
+
+    let serialized = serde_json::to_string(&request).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+    assert_eq!(parsed["jsonrpc"], "2.0");
+    assert_eq!(parsed["method"], "private/get_cancel_on_disconnect");
+    assert!(parsed["id"].is_number());
+}
+
+#[test]
+fn test_request_builder_incremental_ids_cancel_on_disconnect() {
+    let mut builder = RequestBuilder::new();
+
+    let req1 = builder.build_enable_cancel_on_disconnect_request();
+    let req2 = builder.build_disable_cancel_on_disconnect_request();
+    let req3 = builder.build_get_cancel_on_disconnect_request();
+
+    let id1 = req1.id.as_u64().unwrap();
+    let id2 = req2.id.as_u64().unwrap();
+    let id3 = req3.id.as_u64().unwrap();
+
+    assert_eq!(id2, id1 + 1);
+    assert_eq!(id3, id2 + 1);
+}

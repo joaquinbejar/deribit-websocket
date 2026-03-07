@@ -409,6 +409,113 @@ impl DeribitWebSocketClient {
         self.send_request(request).await
     }
 
+    /// Enable automatic order cancellation on disconnect
+    ///
+    /// When enabled, all open orders will be automatically cancelled if the WebSocket
+    /// connection is lost. This is a safety feature to prevent unintended order
+    /// execution when the client loses connectivity.
+    ///
+    /// # Returns
+    ///
+    /// Returns `"ok"` on success
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or requires authentication
+    pub async fn enable_cancel_on_disconnect(&self) -> Result<String, WebSocketError> {
+        let request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_enable_cancel_on_disconnect_request()
+        };
+
+        let response = self.send_request(request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => {
+                result.as_str().map(String::from).ok_or_else(|| {
+                    WebSocketError::InvalidMessage(
+                        "Expected string result from enable_cancel_on_disconnect".to_string(),
+                    )
+                })
+            }
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Disable automatic order cancellation on disconnect
+    ///
+    /// When disabled, orders will remain active even if the WebSocket connection
+    /// is lost.
+    ///
+    /// # Returns
+    ///
+    /// Returns `"ok"` on success
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or requires authentication
+    pub async fn disable_cancel_on_disconnect(&self) -> Result<String, WebSocketError> {
+        let request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_disable_cancel_on_disconnect_request()
+        };
+
+        let response = self.send_request(request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => {
+                result.as_str().map(String::from).ok_or_else(|| {
+                    WebSocketError::InvalidMessage(
+                        "Expected string result from disable_cancel_on_disconnect".to_string(),
+                    )
+                })
+            }
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
+    /// Get current cancel-on-disconnect status
+    ///
+    /// Returns whether automatic order cancellation on disconnect is currently enabled.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if cancel-on-disconnect is enabled, `false` otherwise
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or requires authentication
+    pub async fn get_cancel_on_disconnect(&self) -> Result<bool, WebSocketError> {
+        let request = {
+            let mut builder = self.request_builder.lock().await;
+            builder.build_get_cancel_on_disconnect_request()
+        };
+
+        let response = self.send_request(request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => {
+                // The result contains "enabled" field
+                result
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .ok_or_else(|| {
+                        WebSocketError::InvalidMessage(
+                            "Expected 'enabled' boolean in get_cancel_on_disconnect response"
+                                .to_string(),
+                        )
+                    })
+            }
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
+    }
+
     /// Place mass quotes
     pub async fn mass_quote(
         &self,
