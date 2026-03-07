@@ -11,7 +11,10 @@
 //! - 📊 **Real-time Market Data** - Live ticker, order book, trades, and chart data streaming
 //! - 📈 **Advanced Subscriptions** - Chart data aggregation and user position change notifications
 //! - 💰 **Mass Quote System** - High-performance mass quoting with MMP (Market Maker Protection) groups
-//! - 🔐 **Authentication** - Secure API key and signature-based authentication
+//! - 🔐 **Authentication** - Secure API key and signature-based authentication with typed responses
+//! - 📝 **Trading Operations** - Full order lifecycle: buy, sell, cancel, edit orders
+//! - 💼 **Account Management** - Position queries, account summaries, order history
+//! - 🔄 **Session Management** - Heartbeat control, client identification, cancel-on-disconnect
 //! - 🛡️ **Error Handling** - Comprehensive error types with detailed recovery mechanisms
 //! - ⚡ **Async/Await** - Full async support with tokio runtime for high concurrency
 //! - 🔄 **Callback System** - Flexible message processing with primary and error callbacks
@@ -144,11 +147,31 @@
 //! ## Examples
 //!
 //! The crate includes comprehensive examples demonstrating:
+//!
+//! ### Core Examples
 //! - **`basic_client.rs`** - Basic connection, subscription, and message handling
 //! - **`callback_example.rs`** - Advanced callback system with error handling
 //! - **`advanced_subscriptions.rs`** - Chart data and position change subscriptions
+//!
+//! ### Trading & Account Management (v0.2.0)
+//! - **`trading_operations.rs`** - Buy, sell, cancel, edit orders
+//! - **`account_operations.rs`** - Get positions, account summary, order history
+//! - **`position_management.rs`** - Close positions, move positions between subaccounts
+//!
+//! ### Session Management (v0.2.0)
+//! - **`session_management.rs`** - Hello, heartbeat, typed responses (AuthResponse, HelloResponse, TestResponse)
+//! - **`cancel_on_disconnect.rs`** - Enable/disable/get cancel-on-disconnect status
+//! - **`unsubscribe_all.rs`** - Public and private unsubscribe_all operations
+//!
+//! ### Market Data Subscriptions
+//! - **`new_channels_subscription.rs`** - Grouped order book, incremental ticker, trades by kind
+//! - **`perpetual_subscription.rs`** - Perpetual funding rate subscriptions
+//! - **`quote_subscription.rs`** - Quote data subscriptions
+//! - **`price_index_subscription.rs`** - Price index subscriptions
+//!
+//! ### Mass Quoting
 //! - **`mass_quote_basic.rs`** - Basic mass quoting with MMP group setup
-//! - **`mass_quote_advanced.rs`** - Advanced mass quoting with multiple MMP groups and monitoring
+//! - **`mass_quote_advanced.rs`** - Advanced mass quoting with multiple MMP groups
 //! - **`mass_quote_options.rs`** - Options-specific mass quoting with delta management
 //!
 //! ## Architecture
