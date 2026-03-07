@@ -33,6 +33,12 @@ pub mod methods {
     /// Private unsubscribe from all channels
     pub const PRIVATE_UNSUBSCRIBE_ALL: &str = "private/unsubscribe_all";
 
+    // Session management
+    /// Set heartbeat interval
+    pub const PUBLIC_SET_HEARTBEAT: &str = "public/set_heartbeat";
+    /// Disable heartbeat
+    pub const PUBLIC_DISABLE_HEARTBEAT: &str = "public/disable_heartbeat";
+
     // Market data
     /// Get ticker information
     pub const PUBLIC_GET_TICKER: &str = "public/ticker";
