@@ -1007,6 +1007,8 @@ impl DeribitWebSocketClient {
             | ["deribit_price_ranking", index_name]
             | ["deribit_price_statistics", index_name]
             | ["deribit_volatility_index", index_name] => Some(index_name.to_string()),
+            ["instrument", "state", _kind, currency] => Some(currency.to_string()),
+            ["platform_state"] | ["platform_state", "public_methods_state"] => None,
             _ => None,
         }
     }

@@ -69,11 +69,14 @@ impl SubscriptionManager {
             SubscriptionChannel::EstimatedExpirationPrice(inst)
             | SubscriptionChannel::MarkPrice(inst)
             | SubscriptionChannel::Funding(inst)
-            | SubscriptionChannel::Perpetual(inst)
             | SubscriptionChannel::Quote(inst) => Some(inst.clone()),
+            SubscriptionChannel::Perpetual { instrument, .. } => Some(instrument.clone()),
+            SubscriptionChannel::InstrumentState { currency, .. } => Some(currency.clone()),
             SubscriptionChannel::UserOrders
             | SubscriptionChannel::UserTrades
             | SubscriptionChannel::UserPortfolio
+            | SubscriptionChannel::PlatformState
+            | SubscriptionChannel::PlatformStatePublicMethods
             | SubscriptionChannel::Unknown(_) => None,
         };
         self.add_subscription(channel, channel_type, instrument);

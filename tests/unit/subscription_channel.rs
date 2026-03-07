@@ -176,7 +176,72 @@ fn test_parse_channel_mark_price() {
 #[test]
 fn test_parse_channel_perpetual() {
     let channel = SubscriptionChannel::from_string("perpetual.BTC-PERPETUAL.raw");
-    assert!(matches!(channel, SubscriptionChannel::Perpetual(ref inst) if inst == "BTC-PERPETUAL"));
+    match channel {
+        SubscriptionChannel::Perpetual {
+            instrument,
+            interval,
+        } => {
+            assert_eq!(instrument, "BTC-PERPETUAL");
+            assert_eq!(interval, "raw");
+        }
+        _ => panic!("Expected Perpetual channel"),
+    }
+}
+
+#[test]
+fn test_parse_channel_perpetual_100ms() {
+    let channel = SubscriptionChannel::from_string("perpetual.ETH-PERPETUAL.100ms");
+    match channel {
+        SubscriptionChannel::Perpetual {
+            instrument,
+            interval,
+        } => {
+            assert_eq!(instrument, "ETH-PERPETUAL");
+            assert_eq!(interval, "100ms");
+        }
+        _ => panic!("Expected Perpetual channel"),
+    }
+}
+
+// Test platform state channel parsing
+#[test]
+fn test_parse_channel_platform_state() {
+    let channel = SubscriptionChannel::from_string("platform_state");
+    assert!(matches!(channel, SubscriptionChannel::PlatformState));
+}
+
+#[test]
+fn test_parse_channel_platform_state_public_methods() {
+    let channel = SubscriptionChannel::from_string("platform_state.public_methods_state");
+    assert!(matches!(
+        channel,
+        SubscriptionChannel::PlatformStatePublicMethods
+    ));
+}
+
+// Test instrument state channel parsing
+#[test]
+fn test_parse_channel_instrument_state() {
+    let channel = SubscriptionChannel::from_string("instrument.state.future.BTC");
+    match channel {
+        SubscriptionChannel::InstrumentState { kind, currency } => {
+            assert_eq!(kind, "future");
+            assert_eq!(currency, "BTC");
+        }
+        _ => panic!("Expected InstrumentState channel"),
+    }
+}
+
+#[test]
+fn test_parse_channel_instrument_state_option() {
+    let channel = SubscriptionChannel::from_string("instrument.state.option.ETH");
+    match channel {
+        SubscriptionChannel::InstrumentState { kind, currency } => {
+            assert_eq!(kind, "option");
+            assert_eq!(currency, "ETH");
+        }
+        _ => panic!("Expected InstrumentState channel"),
+    }
 }
 
 // Test quote channel parsing
@@ -298,8 +363,53 @@ fn test_channel_name_mark_price() {
 
 #[test]
 fn test_channel_name_perpetual() {
-    let channel = SubscriptionChannel::Perpetual("BTC-PERPETUAL".to_string());
+    let channel = SubscriptionChannel::Perpetual {
+        instrument: "BTC-PERPETUAL".to_string(),
+        interval: "raw".to_string(),
+    };
     assert_eq!(channel.channel_name(), "perpetual.BTC-PERPETUAL.raw");
+}
+
+#[test]
+fn test_channel_name_perpetual_100ms() {
+    let channel = SubscriptionChannel::Perpetual {
+        instrument: "ETH-PERPETUAL".to_string(),
+        interval: "100ms".to_string(),
+    };
+    assert_eq!(channel.channel_name(), "perpetual.ETH-PERPETUAL.100ms");
+}
+
+#[test]
+fn test_channel_name_platform_state() {
+    let channel = SubscriptionChannel::PlatformState;
+    assert_eq!(channel.channel_name(), "platform_state");
+}
+
+#[test]
+fn test_channel_name_platform_state_public_methods() {
+    let channel = SubscriptionChannel::PlatformStatePublicMethods;
+    assert_eq!(
+        channel.channel_name(),
+        "platform_state.public_methods_state"
+    );
+}
+
+#[test]
+fn test_channel_name_instrument_state() {
+    let channel = SubscriptionChannel::InstrumentState {
+        kind: "future".to_string(),
+        currency: "BTC".to_string(),
+    };
+    assert_eq!(channel.channel_name(), "instrument.state.future.BTC");
+}
+
+#[test]
+fn test_channel_name_instrument_state_option() {
+    let channel = SubscriptionChannel::InstrumentState {
+        kind: "option".to_string(),
+        currency: "ETH".to_string(),
+    };
+    assert_eq!(channel.channel_name(), "instrument.state.option.ETH");
 }
 
 #[test]

@@ -110,4 +110,16 @@ pub mod channels {
     pub const PRICE_STATISTICS: &str = "deribit_price_statistics";
     /// Volatility index channel
     pub const VOLATILITY_INDEX: &str = "deribit_volatility_index";
+    /// Platform state channel
+    pub const PLATFORM_STATE: &str = "platform_state";
+    /// Platform state public methods channel
+    pub const PLATFORM_STATE_PUBLIC_METHODS: &str = "platform_state.public_methods_state";
+    /// Instrument state channel
+    pub const INSTRUMENT_STATE: &str = "instrument.state";
+    /// Perpetual channel
+    pub const PERPETUAL: &str = "perpetual";
+    /// Mark price options channel
+    pub const MARKPRICE_OPTIONS: &str = "markprice.options";
+    /// Quote channel
+    pub const QUOTE: &str = "quote";
 }

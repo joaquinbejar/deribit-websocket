@@ -146,10 +146,26 @@ pub enum SubscriptionChannel {
     MarkPrice(String),
     /// Funding rate updates
     Funding(String),
-    /// Perpetual updates
-    Perpetual(String),
+    /// Perpetual updates with configurable interval
+    Perpetual {
+        /// The trading instrument (e.g., "BTC-PERPETUAL")
+        instrument: String,
+        /// Update interval (e.g., "raw", "100ms")
+        interval: String,
+    },
     /// Quote updates
     Quote(String),
+    /// Platform state updates
+    PlatformState,
+    /// Platform state public methods state updates
+    PlatformStatePublicMethods,
+    /// Instrument state changes for a specific kind and currency
+    InstrumentState {
+        /// Instrument kind (e.g., "future", "option", "spot")
+        kind: String,
+        /// Currency (e.g., "BTC", "ETH")
+        currency: String,
+    },
     /// Grouped order book with configurable depth and interval
     GroupedOrderBook {
         /// The trading instrument (e.g., "BTC-PERPETUAL")
@@ -283,8 +299,20 @@ impl SubscriptionChannel {
                 format!("markprice.options.{}", instrument)
             }
             SubscriptionChannel::Funding(instrument) => format!("perpetual.{}.raw", instrument),
-            SubscriptionChannel::Perpetual(instrument) => format!("perpetual.{}.raw", instrument),
+            SubscriptionChannel::Perpetual {
+                instrument,
+                interval,
+            } => {
+                format!("perpetual.{}.{}", instrument, interval)
+            }
             SubscriptionChannel::Quote(instrument) => format!("quote.{}", instrument),
+            SubscriptionChannel::PlatformState => "platform_state".to_string(),
+            SubscriptionChannel::PlatformStatePublicMethods => {
+                "platform_state.public_methods_state".to_string()
+            }
+            SubscriptionChannel::InstrumentState { kind, currency } => {
+                format!("instrument.state.{}.{}", kind, currency)
+            }
             SubscriptionChannel::GroupedOrderBook {
                 instrument,
                 group,
@@ -376,10 +404,19 @@ impl SubscriptionChannel {
             ["markprice", "options", instrument] => {
                 SubscriptionChannel::MarkPrice(instrument.to_string())
             }
-            ["perpetual", instrument, "raw"] => {
-                SubscriptionChannel::Perpetual(instrument.to_string())
-            }
+            ["perpetual", instrument, interval] => SubscriptionChannel::Perpetual {
+                instrument: instrument.to_string(),
+                interval: interval.to_string(),
+            },
             ["quote", instrument] => SubscriptionChannel::Quote(instrument.to_string()),
+            ["platform_state"] => SubscriptionChannel::PlatformState,
+            ["platform_state", "public_methods_state"] => {
+                SubscriptionChannel::PlatformStatePublicMethods
+            }
+            ["instrument", "state", kind, currency] => SubscriptionChannel::InstrumentState {
+                kind: kind.to_string(),
+                currency: currency.to_string(),
+            },
             ["deribit_price_ranking", index_name] => {
                 SubscriptionChannel::PriceRanking(index_name.to_string())
             }
