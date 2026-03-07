@@ -102,4 +102,12 @@ pub mod channels {
     pub const USER_TRADES: &str = "user.trades";
     /// User portfolio channel
     pub const USER_PORTFOLIO: &str = "user.portfolio";
+    /// Incremental ticker channel
+    pub const INCREMENTAL_TICKER: &str = "incremental_ticker";
+    /// Price ranking channel
+    pub const PRICE_RANKING: &str = "deribit_price_ranking";
+    /// Price statistics channel
+    pub const PRICE_STATISTICS: &str = "deribit_price_statistics";
+    /// Volatility index channel
+    pub const VOLATILITY_INDEX: &str = "deribit_volatility_index";
 }

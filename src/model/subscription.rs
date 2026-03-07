@@ -56,17 +56,25 @@ impl SubscriptionManager {
         let instrument = match &channel_type {
             SubscriptionChannel::Ticker(inst)
             | SubscriptionChannel::OrderBook(inst)
-            | SubscriptionChannel::Trades(inst) => Some(inst.clone()),
-            SubscriptionChannel::ChartTrades { instrument, .. } => Some(instrument.clone()),
+            | SubscriptionChannel::Trades(inst)
+            | SubscriptionChannel::IncrementalTicker(inst) => Some(inst.clone()),
+            SubscriptionChannel::ChartTrades { instrument, .. }
+            | SubscriptionChannel::GroupedOrderBook { instrument, .. } => Some(instrument.clone()),
             SubscriptionChannel::UserChanges { instrument, .. } => Some(instrument.clone()),
-            SubscriptionChannel::PriceIndex(currency) => Some(currency.clone()),
+            SubscriptionChannel::TradesByKind { currency, .. } => Some(currency.clone()),
+            SubscriptionChannel::PriceIndex(index_name)
+            | SubscriptionChannel::PriceRanking(index_name)
+            | SubscriptionChannel::PriceStatistics(index_name)
+            | SubscriptionChannel::VolatilityIndex(index_name) => Some(index_name.clone()),
             SubscriptionChannel::EstimatedExpirationPrice(inst)
             | SubscriptionChannel::MarkPrice(inst)
             | SubscriptionChannel::Funding(inst)
             | SubscriptionChannel::Perpetual(inst)
             | SubscriptionChannel::Quote(inst) => Some(inst.clone()),
-            SubscriptionChannel::Unknown(_) => None,
-            _ => None,
+            SubscriptionChannel::UserOrders
+            | SubscriptionChannel::UserTrades
+            | SubscriptionChannel::UserPortfolio
+            | SubscriptionChannel::Unknown(_) => None,
         };
         self.add_subscription(channel, channel_type, instrument);
     }
