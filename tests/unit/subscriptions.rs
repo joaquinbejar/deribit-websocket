@@ -233,3 +233,424 @@ fn test_request_builder_unsubscribe_all_incremental_ids() {
     assert_eq!(r1.id, serde_json::json!(1));
     assert_eq!(r2.id, serde_json::json!(2));
 }
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_ticker() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    let channels = manager.get_all_channels();
+    assert_eq!(channels.len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_orderbook() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::OrderBook("ETH-PERPETUAL".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_trades() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::Trades("BTC-PERPETUAL".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_incremental_ticker() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::IncrementalTicker("BTC-PERPETUAL".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_chart_trades() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::ChartTrades {
+        instrument: "BTC-PERPETUAL".to_string(),
+        resolution: "1".to_string(),
+    };
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_grouped_orderbook() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::GroupedOrderBook {
+        instrument: "BTC-PERPETUAL".to_string(),
+        group: "5".to_string(),
+        depth: "10".to_string(),
+        interval: "100ms".to_string(),
+    };
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_user_changes() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::UserChanges {
+        instrument: "BTC-PERPETUAL".to_string(),
+        interval: "raw".to_string(),
+    };
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_trades_by_kind() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::TradesByKind {
+        currency: "BTC".to_string(),
+        kind: "future".to_string(),
+        interval: "raw".to_string(),
+    };
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_price_index() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::PriceIndex("btc_usd".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_price_ranking() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::PriceRanking("btc_usd".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_price_statistics() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::PriceStatistics("btc_usd".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_volatility_index() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::VolatilityIndex("btc_usd".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_estimated_expiration() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::EstimatedExpirationPrice("BTC-PERPETUAL".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_mark_price() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::MarkPrice("BTC-PERPETUAL".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_funding() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::Funding("BTC-PERPETUAL".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_quote() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::Quote("BTC-PERPETUAL".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_perpetual() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::Perpetual {
+        instrument: "BTC-PERPETUAL".to_string(),
+        interval: "100ms".to_string(),
+    };
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_instrument_state() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::InstrumentState {
+        currency: "BTC".to_string(),
+        kind: "future".to_string(),
+    };
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_block_rfq() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::BlockRfqTrades("BTC".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_block_trade_confirmations_currency() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::BlockTradeConfirmationsByCurrency("BTC".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_user_mmp_trigger() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::UserMmpTrigger("btc_usd".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_user_orders() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::UserOrders;
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_user_trades() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::UserTrades;
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_user_portfolio() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::UserPortfolio;
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_platform_state() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::PlatformState;
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_platform_state_public() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::PlatformStatePublicMethods;
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_block_trade_confirmations() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::BlockTradeConfirmations;
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_user_access_log() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::UserAccessLog;
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_user_lock() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::UserLock;
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_add_subscription_from_channel_unknown() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = SubscriptionChannel::Unknown("custom.channel".to_string());
+    manager.add_subscription_from_channel(channel);
+    
+    assert_eq!(manager.get_all_channels().len(), 1);
+}
+
+#[test]
+fn test_subscription_manager_get_subscription() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = "ticker.BTC-PERPETUAL".to_string();
+    let channel_type = SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string());
+    manager.add_subscription(channel.clone(), channel_type, Some("BTC-PERPETUAL".to_string()));
+    
+    let subscription = manager.get_subscription(&channel);
+    assert!(subscription.is_some());
+    assert_eq!(subscription.unwrap().channel, channel);
+}
+
+#[test]
+fn test_subscription_manager_get_subscription_not_found() {
+    let manager = SubscriptionManager::new();
+    
+    let subscription = manager.get_subscription("nonexistent");
+    assert!(subscription.is_none());
+}
+
+#[test]
+fn test_subscription_manager_deactivate_subscription() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel = "ticker.BTC-PERPETUAL".to_string();
+    let channel_type = SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string());
+    manager.add_subscription(channel.clone(), channel_type, Some("BTC-PERPETUAL".to_string()));
+    
+    // Should be active by default
+    assert_eq!(manager.active_subscriptions().len(), 1);
+    
+    manager.deactivate_subscription(&channel);
+    
+    // Should now be inactive
+    assert_eq!(manager.active_subscriptions().len(), 0);
+}
+
+#[test]
+fn test_subscription_manager_deactivate_nonexistent() {
+    let mut manager = SubscriptionManager::new();
+    
+    // Should not panic
+    manager.deactivate_subscription("nonexistent");
+}
+
+#[test]
+fn test_subscription_manager_reactivate_all() {
+    let mut manager = SubscriptionManager::new();
+    
+    // Add and deactivate subscriptions
+    let channel1 = "ticker.BTC-PERPETUAL".to_string();
+    let channel2 = "book.ETH-PERPETUAL.100ms".to_string();
+    
+    manager.add_subscription(channel1.clone(), SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string()), None);
+    manager.add_subscription(channel2.clone(), SubscriptionChannel::OrderBook("ETH-PERPETUAL".to_string()), None);
+    
+    manager.deactivate_subscription(&channel1);
+    manager.deactivate_subscription(&channel2);
+    
+    assert_eq!(manager.active_subscriptions().len(), 0);
+    
+    manager.reactivate_all();
+    
+    assert_eq!(manager.active_subscriptions().len(), 2);
+}
+
+#[test]
+fn test_subscription_manager_get_active_channels() {
+    let mut manager = SubscriptionManager::new();
+    
+    let channel1 = "ticker.BTC-PERPETUAL".to_string();
+    let channel2 = "book.ETH-PERPETUAL.100ms".to_string();
+    
+    manager.add_subscription(channel1.clone(), SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string()), None);
+    manager.add_subscription(channel2.clone(), SubscriptionChannel::OrderBook("ETH-PERPETUAL".to_string()), None);
+    
+    manager.deactivate_subscription(&channel1);
+    
+    let active_channels = manager.get_active_channels();
+    assert_eq!(active_channels.len(), 1);
+    assert!(active_channels.contains(&channel2));
+}
+
+#[test]
+fn test_subscription_manager_active_subscriptions() {
+    let mut manager = SubscriptionManager::new();
+    
+    manager.add_subscription(
+        "ticker.BTC-PERPETUAL".to_string(),
+        SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string()),
+        Some("BTC-PERPETUAL".to_string()),
+    );
+    
+    let active = manager.active_subscriptions();
+    assert_eq!(active.len(), 1);
+    assert!(active[0].active);
+}
