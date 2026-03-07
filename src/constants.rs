@@ -122,4 +122,8 @@ pub mod channels {
     pub const MARKPRICE_OPTIONS: &str = "markprice.options";
     /// Quote channel
     pub const QUOTE: &str = "quote";
+    /// Block RFQ trades channel
+    pub const BLOCK_RFQ_TRADES: &str = "block_rfq.trades";
+    /// Block trade confirmations channel
+    pub const BLOCK_TRADE_CONFIRMATIONS: &str = "block_trade_confirmations";
 }

@@ -194,6 +194,12 @@ pub enum SubscriptionChannel {
     PriceStatistics(String),
     /// Volatility index data
     VolatilityIndex(String),
+    /// Block RFQ trades for a specific currency
+    BlockRfqTrades(String),
+    /// Block trade confirmations (all currencies)
+    BlockTradeConfirmations,
+    /// Block trade confirmations for a specific currency
+    BlockTradeConfirmationsByCurrency(String),
     /// Unknown or unrecognized channel
     Unknown(String),
 }
@@ -340,6 +346,13 @@ impl SubscriptionChannel {
             SubscriptionChannel::VolatilityIndex(index_name) => {
                 format!("deribit_volatility_index.{}", index_name)
             }
+            SubscriptionChannel::BlockRfqTrades(currency) => {
+                format!("block_rfq.trades.{}", currency)
+            }
+            SubscriptionChannel::BlockTradeConfirmations => "block_trade_confirmations".to_string(),
+            SubscriptionChannel::BlockTradeConfirmationsByCurrency(currency) => {
+                format!("block_trade_confirmations.{}", currency)
+            }
             SubscriptionChannel::Unknown(channel) => channel.clone(),
         }
     }
@@ -425,6 +438,13 @@ impl SubscriptionChannel {
             }
             ["deribit_volatility_index", index_name] => {
                 SubscriptionChannel::VolatilityIndex(index_name.to_string())
+            }
+            ["block_rfq", "trades", currency] => {
+                SubscriptionChannel::BlockRfqTrades(currency.to_string())
+            }
+            ["block_trade_confirmations"] => SubscriptionChannel::BlockTradeConfirmations,
+            ["block_trade_confirmations", currency] => {
+                SubscriptionChannel::BlockTradeConfirmationsByCurrency(currency.to_string())
             }
             _ => SubscriptionChannel::Unknown(s.to_string()),
         }

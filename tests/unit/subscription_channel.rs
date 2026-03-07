@@ -774,3 +774,153 @@ fn test_trades_by_kind_equality() {
     assert_eq!(channel1, channel2);
     assert_ne!(channel1, channel3);
 }
+
+// =============================================================================
+// Tests for block trade subscription channels (Issue #12)
+// =============================================================================
+
+// Test block_rfq.trades channel parsing
+#[test]
+fn test_parse_channel_block_rfq_trades() {
+    let channel = SubscriptionChannel::from_string("block_rfq.trades.BTC");
+    assert!(
+        matches!(channel, SubscriptionChannel::BlockRfqTrades(ref currency) if currency == "BTC")
+    );
+}
+
+#[test]
+fn test_parse_channel_block_rfq_trades_eth() {
+    let channel = SubscriptionChannel::from_string("block_rfq.trades.ETH");
+    assert!(
+        matches!(channel, SubscriptionChannel::BlockRfqTrades(ref currency) if currency == "ETH")
+    );
+}
+
+// Test block_trade_confirmations channel parsing
+#[test]
+fn test_parse_channel_block_trade_confirmations() {
+    let channel = SubscriptionChannel::from_string("block_trade_confirmations");
+    assert!(matches!(
+        channel,
+        SubscriptionChannel::BlockTradeConfirmations
+    ));
+}
+
+#[test]
+fn test_parse_channel_block_trade_confirmations_by_currency() {
+    let channel = SubscriptionChannel::from_string("block_trade_confirmations.BTC");
+    assert!(matches!(
+        channel,
+        SubscriptionChannel::BlockTradeConfirmationsByCurrency(ref currency) if currency == "BTC"
+    ));
+}
+
+#[test]
+fn test_parse_channel_block_trade_confirmations_by_currency_eth() {
+    let channel = SubscriptionChannel::from_string("block_trade_confirmations.ETH");
+    assert!(matches!(
+        channel,
+        SubscriptionChannel::BlockTradeConfirmationsByCurrency(ref currency) if currency == "ETH"
+    ));
+}
+
+// Test channel_name for block trade channels
+#[test]
+fn test_channel_name_block_rfq_trades() {
+    let channel = SubscriptionChannel::BlockRfqTrades("BTC".to_string());
+    assert_eq!(channel.channel_name(), "block_rfq.trades.BTC");
+}
+
+#[test]
+fn test_channel_name_block_rfq_trades_eth() {
+    let channel = SubscriptionChannel::BlockRfqTrades("ETH".to_string());
+    assert_eq!(channel.channel_name(), "block_rfq.trades.ETH");
+}
+
+#[test]
+fn test_channel_name_block_trade_confirmations() {
+    let channel = SubscriptionChannel::BlockTradeConfirmations;
+    assert_eq!(channel.channel_name(), "block_trade_confirmations");
+}
+
+#[test]
+fn test_channel_name_block_trade_confirmations_by_currency() {
+    let channel = SubscriptionChannel::BlockTradeConfirmationsByCurrency("BTC".to_string());
+    assert_eq!(channel.channel_name(), "block_trade_confirmations.BTC");
+}
+
+#[test]
+fn test_channel_name_block_trade_confirmations_by_currency_eth() {
+    let channel = SubscriptionChannel::BlockTradeConfirmationsByCurrency("ETH".to_string());
+    assert_eq!(channel.channel_name(), "block_trade_confirmations.ETH");
+}
+
+// Test is_unknown for block trade channels
+#[test]
+fn test_is_unknown_block_rfq_trades() {
+    let channel = SubscriptionChannel::BlockRfqTrades("BTC".to_string());
+    assert!(!channel.is_unknown());
+}
+
+#[test]
+fn test_is_unknown_block_trade_confirmations() {
+    let channel = SubscriptionChannel::BlockTradeConfirmations;
+    assert!(!channel.is_unknown());
+}
+
+#[test]
+fn test_is_unknown_block_trade_confirmations_by_currency() {
+    let channel = SubscriptionChannel::BlockTradeConfirmationsByCurrency("BTC".to_string());
+    assert!(!channel.is_unknown());
+}
+
+// Test equality for block trade channels
+#[test]
+fn test_block_rfq_trades_equality() {
+    let channel1 = SubscriptionChannel::BlockRfqTrades("BTC".to_string());
+    let channel2 = SubscriptionChannel::BlockRfqTrades("BTC".to_string());
+    let channel3 = SubscriptionChannel::BlockRfqTrades("ETH".to_string());
+    assert_eq!(channel1, channel2);
+    assert_ne!(channel1, channel3);
+}
+
+#[test]
+fn test_block_trade_confirmations_equality() {
+    let channel1 = SubscriptionChannel::BlockTradeConfirmations;
+    let channel2 = SubscriptionChannel::BlockTradeConfirmations;
+    assert_eq!(channel1, channel2);
+}
+
+#[test]
+fn test_block_trade_confirmations_by_currency_equality() {
+    let channel1 = SubscriptionChannel::BlockTradeConfirmationsByCurrency("BTC".to_string());
+    let channel2 = SubscriptionChannel::BlockTradeConfirmationsByCurrency("BTC".to_string());
+    let channel3 = SubscriptionChannel::BlockTradeConfirmationsByCurrency("ETH".to_string());
+    assert_eq!(channel1, channel2);
+    assert_ne!(channel1, channel3);
+}
+
+// Test roundtrip for block trade channels
+#[test]
+fn test_block_rfq_trades_roundtrip() {
+    let original = SubscriptionChannel::BlockRfqTrades("BTC".to_string());
+    let channel_name = original.channel_name();
+    let parsed = SubscriptionChannel::from_string(&channel_name);
+    assert_eq!(original, parsed);
+}
+
+#[test]
+fn test_block_trade_confirmations_roundtrip() {
+    let original = SubscriptionChannel::BlockTradeConfirmations;
+    let channel_name = original.channel_name();
+    let parsed = SubscriptionChannel::from_string(&channel_name);
+    assert_eq!(original, parsed);
+}
+
+#[test]
+fn test_block_trade_confirmations_by_currency_roundtrip() {
+    let original = SubscriptionChannel::BlockTradeConfirmationsByCurrency("BTC".to_string());
+    let channel_name = original.channel_name();
+    let parsed = SubscriptionChannel::from_string(&channel_name);
+    assert_eq!(original, parsed);
+}
