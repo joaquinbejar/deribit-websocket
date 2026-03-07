@@ -1002,7 +1002,11 @@ impl DeribitWebSocketClient {
             ["markprice", "options", instrument] => Some(instrument.to_string()),
             ["perpetual", instrument, _] => Some(instrument.to_string()),
             ["quote", instrument] => Some(instrument.to_string()),
-            ["deribit_price_index", currency] => Some(currency.to_string()),
+            ["incremental_ticker", instrument] => Some(instrument.to_string()),
+            ["deribit_price_index", index_name]
+            | ["deribit_price_ranking", index_name]
+            | ["deribit_price_statistics", index_name]
+            | ["deribit_volatility_index", index_name] => Some(index_name.to_string()),
             _ => None,
         }
     }

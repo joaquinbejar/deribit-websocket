@@ -150,6 +150,34 @@ pub enum SubscriptionChannel {
     Perpetual(String),
     /// Quote updates
     Quote(String),
+    /// Grouped order book with configurable depth and interval
+    GroupedOrderBook {
+        /// The trading instrument (e.g., "BTC-PERPETUAL")
+        instrument: String,
+        /// Grouping level for aggregation
+        group: String,
+        /// Order book depth (e.g., "1", "10", "20")
+        depth: String,
+        /// Update interval (e.g., "100ms", "agg2")
+        interval: String,
+    },
+    /// Incremental ticker updates for a specific instrument
+    IncrementalTicker(String),
+    /// Trades by instrument kind (e.g., future, option) and currency
+    TradesByKind {
+        /// Instrument kind (e.g., "future", "option", "spot", "any")
+        kind: String,
+        /// Currency (e.g., "BTC", "ETH", "any")
+        currency: String,
+        /// Update interval (e.g., "raw", "100ms")
+        interval: String,
+    },
+    /// Price ranking data for an index
+    PriceRanking(String),
+    /// Price statistics for an index
+    PriceStatistics(String),
+    /// Volatility index data
+    VolatilityIndex(String),
     /// Unknown or unrecognized channel
     Unknown(String),
 }
@@ -257,6 +285,33 @@ impl SubscriptionChannel {
             SubscriptionChannel::Funding(instrument) => format!("perpetual.{}.raw", instrument),
             SubscriptionChannel::Perpetual(instrument) => format!("perpetual.{}.raw", instrument),
             SubscriptionChannel::Quote(instrument) => format!("quote.{}", instrument),
+            SubscriptionChannel::GroupedOrderBook {
+                instrument,
+                group,
+                depth,
+                interval,
+            } => {
+                format!("book.{}.{}.{}.{}", instrument, group, depth, interval)
+            }
+            SubscriptionChannel::IncrementalTicker(instrument) => {
+                format!("incremental_ticker.{}", instrument)
+            }
+            SubscriptionChannel::TradesByKind {
+                kind,
+                currency,
+                interval,
+            } => {
+                format!("trades.{}.{}.{}", kind, currency, interval)
+            }
+            SubscriptionChannel::PriceRanking(index_name) => {
+                format!("deribit_price_ranking.{}", index_name)
+            }
+            SubscriptionChannel::PriceStatistics(index_name) => {
+                format!("deribit_price_statistics.{}", index_name)
+            }
+            SubscriptionChannel::VolatilityIndex(index_name) => {
+                format!("deribit_volatility_index.{}", index_name)
+            }
             SubscriptionChannel::Unknown(channel) => channel.clone(),
         }
     }
@@ -274,10 +329,26 @@ impl SubscriptionChannel {
                 SubscriptionChannel::Ticker(instrument.to_string())
             }
             ["book", instrument, "raw"] => SubscriptionChannel::OrderBook(instrument.to_string()),
+            ["book", instrument, group, depth, interval] => SubscriptionChannel::GroupedOrderBook {
+                instrument: instrument.to_string(),
+                group: group.to_string(),
+                depth: depth.to_string(),
+                interval: interval.to_string(),
+            },
             ["book", instrument, _depth, _interval] => {
                 SubscriptionChannel::OrderBook(instrument.to_string())
             }
+            ["incremental_ticker", instrument] => {
+                SubscriptionChannel::IncrementalTicker(instrument.to_string())
+            }
             ["trades", instrument, "raw"] => SubscriptionChannel::Trades(instrument.to_string()),
+            ["trades", kind, currency, interval] if !Self::looks_like_instrument(kind) => {
+                SubscriptionChannel::TradesByKind {
+                    kind: kind.to_string(),
+                    currency: currency.to_string(),
+                    interval: interval.to_string(),
+                }
+            }
             ["trades", instrument, _interval] => {
                 SubscriptionChannel::Trades(instrument.to_string())
             }
@@ -309,6 +380,15 @@ impl SubscriptionChannel {
                 SubscriptionChannel::Perpetual(instrument.to_string())
             }
             ["quote", instrument] => SubscriptionChannel::Quote(instrument.to_string()),
+            ["deribit_price_ranking", index_name] => {
+                SubscriptionChannel::PriceRanking(index_name.to_string())
+            }
+            ["deribit_price_statistics", index_name] => {
+                SubscriptionChannel::PriceStatistics(index_name.to_string())
+            }
+            ["deribit_volatility_index", index_name] => {
+                SubscriptionChannel::VolatilityIndex(index_name.to_string())
+            }
             _ => SubscriptionChannel::Unknown(s.to_string()),
         }
     }
@@ -317,6 +397,15 @@ impl SubscriptionChannel {
     #[must_use]
     pub fn is_unknown(&self) -> bool {
         matches!(self, SubscriptionChannel::Unknown(_))
+    }
+
+    /// Check if a string looks like an instrument name (contains hyphen).
+    ///
+    /// Used to distinguish between `trades.{instrument}.{interval}` and
+    /// `trades.{kind}.{currency}.{interval}` patterns.
+    #[must_use]
+    fn looks_like_instrument(s: &str) -> bool {
+        s.contains('-')
     }
 }
 

@@ -347,3 +347,320 @@ fn test_subscription_channel_clone() {
     let cloned = channel.clone();
     assert_eq!(channel, cloned);
 }
+
+// =============================================================================
+// Tests for new subscription channels (Issue #10)
+// =============================================================================
+
+// Test grouped order book channel parsing
+#[test]
+fn test_parse_channel_grouped_orderbook() {
+    let channel = SubscriptionChannel::from_string("book.BTC-PERPETUAL.100.10.100ms");
+    match channel {
+        SubscriptionChannel::GroupedOrderBook {
+            instrument,
+            group,
+            depth,
+            interval,
+        } => {
+            assert_eq!(instrument, "BTC-PERPETUAL");
+            assert_eq!(group, "100");
+            assert_eq!(depth, "10");
+            assert_eq!(interval, "100ms");
+        }
+        _ => panic!("Expected GroupedOrderBook variant"),
+    }
+}
+
+#[test]
+fn test_parse_channel_grouped_orderbook_agg2() {
+    let channel = SubscriptionChannel::from_string("book.ETH-PERPETUAL.10.20.agg2");
+    match channel {
+        SubscriptionChannel::GroupedOrderBook {
+            instrument,
+            group,
+            depth,
+            interval,
+        } => {
+            assert_eq!(instrument, "ETH-PERPETUAL");
+            assert_eq!(group, "10");
+            assert_eq!(depth, "20");
+            assert_eq!(interval, "agg2");
+        }
+        _ => panic!("Expected GroupedOrderBook variant"),
+    }
+}
+
+// Test incremental ticker channel parsing
+#[test]
+fn test_parse_channel_incremental_ticker() {
+    let channel = SubscriptionChannel::from_string("incremental_ticker.BTC-PERPETUAL");
+    assert!(
+        matches!(channel, SubscriptionChannel::IncrementalTicker(ref inst) if inst == "BTC-PERPETUAL")
+    );
+}
+
+#[test]
+fn test_parse_channel_incremental_ticker_eth() {
+    let channel = SubscriptionChannel::from_string("incremental_ticker.ETH-PERPETUAL");
+    assert!(
+        matches!(channel, SubscriptionChannel::IncrementalTicker(ref inst) if inst == "ETH-PERPETUAL")
+    );
+}
+
+// Test trades by kind channel parsing
+#[test]
+fn test_parse_channel_trades_by_kind() {
+    let channel = SubscriptionChannel::from_string("trades.future.BTC.raw");
+    match channel {
+        SubscriptionChannel::TradesByKind {
+            kind,
+            currency,
+            interval,
+        } => {
+            assert_eq!(kind, "future");
+            assert_eq!(currency, "BTC");
+            assert_eq!(interval, "raw");
+        }
+        _ => panic!("Expected TradesByKind variant"),
+    }
+}
+
+#[test]
+fn test_parse_channel_trades_by_kind_option() {
+    let channel = SubscriptionChannel::from_string("trades.option.ETH.100ms");
+    match channel {
+        SubscriptionChannel::TradesByKind {
+            kind,
+            currency,
+            interval,
+        } => {
+            assert_eq!(kind, "option");
+            assert_eq!(currency, "ETH");
+            assert_eq!(interval, "100ms");
+        }
+        _ => panic!("Expected TradesByKind variant"),
+    }
+}
+
+#[test]
+fn test_parse_channel_trades_by_kind_any() {
+    let channel = SubscriptionChannel::from_string("trades.any.any.raw");
+    match channel {
+        SubscriptionChannel::TradesByKind {
+            kind,
+            currency,
+            interval,
+        } => {
+            assert_eq!(kind, "any");
+            assert_eq!(currency, "any");
+            assert_eq!(interval, "raw");
+        }
+        _ => panic!("Expected TradesByKind variant"),
+    }
+}
+
+// Test price ranking channel parsing
+#[test]
+fn test_parse_channel_price_ranking() {
+    let channel = SubscriptionChannel::from_string("deribit_price_ranking.btc_usd");
+    assert!(matches!(channel, SubscriptionChannel::PriceRanking(ref idx) if idx == "btc_usd"));
+}
+
+#[test]
+fn test_parse_channel_price_ranking_eth() {
+    let channel = SubscriptionChannel::from_string("deribit_price_ranking.eth_usd");
+    assert!(matches!(channel, SubscriptionChannel::PriceRanking(ref idx) if idx == "eth_usd"));
+}
+
+// Test price statistics channel parsing
+#[test]
+fn test_parse_channel_price_statistics() {
+    let channel = SubscriptionChannel::from_string("deribit_price_statistics.btc_usd");
+    assert!(matches!(channel, SubscriptionChannel::PriceStatistics(ref idx) if idx == "btc_usd"));
+}
+
+#[test]
+fn test_parse_channel_price_statistics_eth() {
+    let channel = SubscriptionChannel::from_string("deribit_price_statistics.eth_usd");
+    assert!(matches!(channel, SubscriptionChannel::PriceStatistics(ref idx) if idx == "eth_usd"));
+}
+
+// Test volatility index channel parsing
+#[test]
+fn test_parse_channel_volatility_index() {
+    let channel = SubscriptionChannel::from_string("deribit_volatility_index.btc_usd");
+    assert!(matches!(channel, SubscriptionChannel::VolatilityIndex(ref idx) if idx == "btc_usd"));
+}
+
+#[test]
+fn test_parse_channel_volatility_index_eth() {
+    let channel = SubscriptionChannel::from_string("deribit_volatility_index.eth_usd");
+    assert!(matches!(channel, SubscriptionChannel::VolatilityIndex(ref idx) if idx == "eth_usd"));
+}
+
+// Test channel_name for new variants
+#[test]
+fn test_channel_name_grouped_orderbook() {
+    let channel = SubscriptionChannel::GroupedOrderBook {
+        instrument: "BTC-PERPETUAL".to_string(),
+        group: "100".to_string(),
+        depth: "10".to_string(),
+        interval: "100ms".to_string(),
+    };
+    assert_eq!(channel.channel_name(), "book.BTC-PERPETUAL.100.10.100ms");
+}
+
+#[test]
+fn test_channel_name_incremental_ticker() {
+    let channel = SubscriptionChannel::IncrementalTicker("BTC-PERPETUAL".to_string());
+    assert_eq!(channel.channel_name(), "incremental_ticker.BTC-PERPETUAL");
+}
+
+#[test]
+fn test_channel_name_trades_by_kind() {
+    let channel = SubscriptionChannel::TradesByKind {
+        kind: "future".to_string(),
+        currency: "BTC".to_string(),
+        interval: "raw".to_string(),
+    };
+    assert_eq!(channel.channel_name(), "trades.future.BTC.raw");
+}
+
+#[test]
+fn test_channel_name_price_ranking() {
+    let channel = SubscriptionChannel::PriceRanking("btc_usd".to_string());
+    assert_eq!(channel.channel_name(), "deribit_price_ranking.btc_usd");
+}
+
+#[test]
+fn test_channel_name_price_statistics() {
+    let channel = SubscriptionChannel::PriceStatistics("btc_usd".to_string());
+    assert_eq!(channel.channel_name(), "deribit_price_statistics.btc_usd");
+}
+
+#[test]
+fn test_channel_name_volatility_index() {
+    let channel = SubscriptionChannel::VolatilityIndex("btc_usd".to_string());
+    assert_eq!(channel.channel_name(), "deribit_volatility_index.btc_usd");
+}
+
+// Test Display trait for new variants
+#[test]
+fn test_display_grouped_orderbook() {
+    let channel = SubscriptionChannel::GroupedOrderBook {
+        instrument: "BTC-PERPETUAL".to_string(),
+        group: "100".to_string(),
+        depth: "10".to_string(),
+        interval: "100ms".to_string(),
+    };
+    assert_eq!(format!("{}", channel), "book.BTC-PERPETUAL.100.10.100ms");
+}
+
+#[test]
+fn test_display_incremental_ticker() {
+    let channel = SubscriptionChannel::IncrementalTicker("BTC-PERPETUAL".to_string());
+    assert_eq!(format!("{}", channel), "incremental_ticker.BTC-PERPETUAL");
+}
+
+#[test]
+fn test_display_trades_by_kind() {
+    let channel = SubscriptionChannel::TradesByKind {
+        kind: "option".to_string(),
+        currency: "ETH".to_string(),
+        interval: "100ms".to_string(),
+    };
+    assert_eq!(format!("{}", channel), "trades.option.ETH.100ms");
+}
+
+// Test is_unknown returns false for new variants
+#[test]
+fn test_is_unknown_grouped_orderbook() {
+    let channel = SubscriptionChannel::GroupedOrderBook {
+        instrument: "BTC-PERPETUAL".to_string(),
+        group: "100".to_string(),
+        depth: "10".to_string(),
+        interval: "100ms".to_string(),
+    };
+    assert!(!channel.is_unknown());
+}
+
+#[test]
+fn test_is_unknown_incremental_ticker() {
+    let channel = SubscriptionChannel::IncrementalTicker("BTC-PERPETUAL".to_string());
+    assert!(!channel.is_unknown());
+}
+
+#[test]
+fn test_is_unknown_trades_by_kind() {
+    let channel = SubscriptionChannel::TradesByKind {
+        kind: "future".to_string(),
+        currency: "BTC".to_string(),
+        interval: "raw".to_string(),
+    };
+    assert!(!channel.is_unknown());
+}
+
+#[test]
+fn test_is_unknown_price_ranking() {
+    let channel = SubscriptionChannel::PriceRanking("btc_usd".to_string());
+    assert!(!channel.is_unknown());
+}
+
+#[test]
+fn test_is_unknown_price_statistics() {
+    let channel = SubscriptionChannel::PriceStatistics("btc_usd".to_string());
+    assert!(!channel.is_unknown());
+}
+
+#[test]
+fn test_is_unknown_volatility_index() {
+    let channel = SubscriptionChannel::VolatilityIndex("btc_usd".to_string());
+    assert!(!channel.is_unknown());
+}
+
+// Test equality for new variants
+#[test]
+fn test_grouped_orderbook_equality() {
+    let channel1 = SubscriptionChannel::GroupedOrderBook {
+        instrument: "BTC-PERPETUAL".to_string(),
+        group: "100".to_string(),
+        depth: "10".to_string(),
+        interval: "100ms".to_string(),
+    };
+    let channel2 = SubscriptionChannel::GroupedOrderBook {
+        instrument: "BTC-PERPETUAL".to_string(),
+        group: "100".to_string(),
+        depth: "10".to_string(),
+        interval: "100ms".to_string(),
+    };
+    let channel3 = SubscriptionChannel::GroupedOrderBook {
+        instrument: "ETH-PERPETUAL".to_string(),
+        group: "100".to_string(),
+        depth: "10".to_string(),
+        interval: "100ms".to_string(),
+    };
+    assert_eq!(channel1, channel2);
+    assert_ne!(channel1, channel3);
+}
+
+#[test]
+fn test_trades_by_kind_equality() {
+    let channel1 = SubscriptionChannel::TradesByKind {
+        kind: "future".to_string(),
+        currency: "BTC".to_string(),
+        interval: "raw".to_string(),
+    };
+    let channel2 = SubscriptionChannel::TradesByKind {
+        kind: "future".to_string(),
+        currency: "BTC".to_string(),
+        interval: "raw".to_string(),
+    };
+    let channel3 = SubscriptionChannel::TradesByKind {
+        kind: "option".to_string(),
+        currency: "BTC".to_string(),
+        interval: "raw".to_string(),
+    };
+    assert_eq!(channel1, channel2);
+    assert_ne!(channel1, channel3);
+}
