@@ -85,21 +85,12 @@ async fn test_oauth_authentication_flow() -> Result<(), Box<dyn std::error::Erro
             info!("✅ Authentication successful");
             debug!("Auth response: {:?}", auth_response);
 
-            // Verify we have an access token
-            match &auth_response.result {
-                deribit_websocket::model::JsonRpcResult::Success { result } => {
-                    if let Some(token) = result.get("access_token") {
-                        info!(
-                            "✅ Access token received: {}...",
-                            &token.as_str().unwrap_or("")[..10]
-                        );
-                    } else {
-                        return Err("No access token in authentication response".into());
-                    }
-                }
-                deribit_websocket::model::JsonRpcResult::Error { error } => {
-                    return Err(format!("Authentication error: {}", error.message).into());
-                }
+            // Verify we have an access token (now directly available from AuthResponse)
+            let token = &auth_response.access_token;
+            if token.len() >= 10 {
+                info!("✅ Access token received: {}...", &token[..10]);
+            } else {
+                info!("✅ Access token received: {}", token);
             }
         }
         Err(e) => {

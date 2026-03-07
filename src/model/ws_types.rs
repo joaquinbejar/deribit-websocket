@@ -70,6 +70,35 @@ pub struct JsonRpcError {
     pub data: Option<serde_json::Value>,
 }
 
+/// Authentication response from Deribit API
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AuthResponse {
+    /// Access token for authenticated requests
+    pub access_token: String,
+    /// Token type (usually "bearer")
+    pub token_type: String,
+    /// Token expiration time in seconds
+    pub expires_in: i64,
+    /// Refresh token for token renewal
+    pub refresh_token: String,
+    /// Scope of the token
+    pub scope: String,
+}
+
+/// Hello response containing API version information
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HelloResponse {
+    /// API version string
+    pub version: String,
+}
+
+/// Test connection response
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TestResponse {
+    /// API version string
+    pub version: String,
+}
+
 /// JSON-RPC 2.0 notification structure (no response expected)
 #[derive(Clone, Serialize, Deserialize, PartialEq, DebugPretty, DisplaySimple)]
 pub struct JsonRpcNotification {

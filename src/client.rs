@@ -99,17 +99,45 @@ impl DeribitWebSocketClient {
     }
 
     /// Authenticate with the server
+    ///
+    /// Authenticates the connection using API credentials and returns authentication
+    /// details including access token and refresh token.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - API client ID
+    /// * `client_secret` - API client secret
+    ///
+    /// # Returns
+    ///
+    /// Returns `AuthResponse` containing access token, token type, expiration, and scope
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authentication fails or credentials are invalid
     pub async fn authenticate(
         &self,
         client_id: &str,
         client_secret: &str,
-    ) -> Result<JsonRpcResponse, WebSocketError> {
+    ) -> Result<crate::model::AuthResponse, WebSocketError> {
         let request = {
             let mut builder = self.request_builder.lock().await;
             builder.build_auth_request(client_id, client_secret)
         };
 
-        self.send_request(request).await
+        let response = self.send_request(request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "Failed to parse authentication response: {}",
+                    e
+                ))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
     }
 
     /// Subscribe to channels
@@ -288,23 +316,63 @@ impl DeribitWebSocketClient {
     }
 
     /// Test connection
-    pub async fn test_connection(&self) -> Result<JsonRpcResponse, WebSocketError> {
+    ///
+    /// Tests the WebSocket connection and returns API version information.
+    ///
+    /// # Returns
+    ///
+    /// Returns `TestResponse` containing the API version string
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the connection test fails
+    pub async fn test_connection(&self) -> Result<crate::model::TestResponse, WebSocketError> {
         let request = {
             let mut builder = self.request_builder.lock().await;
             builder.build_test_request()
         };
 
-        self.send_request(request).await
+        let response = self.send_request(request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!("Failed to parse test response: {}", e))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
     }
 
     /// Get server time
-    pub async fn get_time(&self) -> Result<JsonRpcResponse, WebSocketError> {
+    ///
+    /// Returns the current server timestamp in milliseconds since Unix epoch.
+    ///
+    /// # Returns
+    ///
+    /// Returns `u64` timestamp in milliseconds
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails
+    pub async fn get_time(&self) -> Result<u64, WebSocketError> {
         let request = {
             let mut builder = self.request_builder.lock().await;
             builder.build_get_time_request()
         };
 
-        self.send_request(request).await
+        let response = self.send_request(request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => result.as_u64().ok_or_else(|| {
+                WebSocketError::InvalidMessage(
+                    "Expected u64 timestamp in get_time response".to_string(),
+                )
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
     }
 
     /// Enable heartbeat with specified interval
@@ -391,7 +459,7 @@ impl DeribitWebSocketClient {
     ///
     /// # Returns
     ///
-    /// Returns a JSON response containing the API version information
+    /// Returns `HelloResponse` containing the API version information
     ///
     /// # Errors
     ///
@@ -400,13 +468,22 @@ impl DeribitWebSocketClient {
         &self,
         client_name: &str,
         client_version: &str,
-    ) -> Result<JsonRpcResponse, WebSocketError> {
+    ) -> Result<crate::model::HelloResponse, WebSocketError> {
         let request = {
             let mut builder = self.request_builder.lock().await;
             builder.build_hello_request(client_name, client_version)
         };
 
-        self.send_request(request).await
+        let response = self.send_request(request).await?;
+
+        match response.result {
+            JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
+                WebSocketError::InvalidMessage(format!("Failed to parse hello response: {}", e))
+            }),
+            JsonRpcResult::Error { error } => {
+                Err(WebSocketError::ApiError(error.code, error.message))
+            }
+        }
     }
 
     /// Enable automatic order cancellation on disconnect
