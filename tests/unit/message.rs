@@ -361,3 +361,152 @@ fn test_request_builder_incremental_ids_cancel_on_disconnect() {
     assert_eq!(id2, id1 + 1);
     assert_eq!(id3, id2 + 1);
 }
+
+// =============================================================================
+// Typed response deserialization tests (Issue #16)
+// =============================================================================
+
+use deribit_websocket::model::{AuthResponse, HelloResponse, TestResponse};
+
+#[test]
+fn test_auth_response_deserialization() {
+    let json = r#"{
+        "access_token": "test_access_token_12345",
+        "token_type": "bearer",
+        "expires_in": 3600,
+        "refresh_token": "test_refresh_token_67890",
+        "scope": "session:name read write"
+    }"#;
+
+    let response: AuthResponse = serde_json::from_str(json).unwrap();
+
+    assert_eq!(response.access_token, "test_access_token_12345");
+    assert_eq!(response.token_type, "bearer");
+    assert_eq!(response.expires_in, 3600);
+    assert_eq!(response.refresh_token, "test_refresh_token_67890");
+    assert_eq!(response.scope, "session:name read write");
+}
+
+#[test]
+fn test_auth_response_serialization() {
+    let response = AuthResponse {
+        access_token: "access123".to_string(),
+        token_type: "bearer".to_string(),
+        expires_in: 7200,
+        refresh_token: "refresh456".to_string(),
+        scope: "trade:read_write".to_string(),
+    };
+
+    let serialized = serde_json::to_string(&response).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+    assert_eq!(parsed["access_token"], "access123");
+    assert_eq!(parsed["token_type"], "bearer");
+    assert_eq!(parsed["expires_in"], 7200);
+    assert_eq!(parsed["refresh_token"], "refresh456");
+    assert_eq!(parsed["scope"], "trade:read_write");
+}
+
+#[test]
+fn test_hello_response_deserialization() {
+    let json = r#"{"version": "2.1.0"}"#;
+
+    let response: HelloResponse = serde_json::from_str(json).unwrap();
+
+    assert_eq!(response.version, "2.1.0");
+}
+
+#[test]
+fn test_hello_response_serialization() {
+    let response = HelloResponse {
+        version: "2.0.0".to_string(),
+    };
+
+    let serialized = serde_json::to_string(&response).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+    assert_eq!(parsed["version"], "2.0.0");
+}
+
+#[test]
+fn test_test_response_deserialization() {
+    let json = r#"{"version": "1.2.26"}"#;
+
+    let response: TestResponse = serde_json::from_str(json).unwrap();
+
+    assert_eq!(response.version, "1.2.26");
+}
+
+#[test]
+fn test_test_response_serialization() {
+    let response = TestResponse {
+        version: "1.2.30".to_string(),
+    };
+
+    let serialized = serde_json::to_string(&response).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+    assert_eq!(parsed["version"], "1.2.30");
+}
+
+#[test]
+fn test_auth_response_equality() {
+    let response1 = AuthResponse {
+        access_token: "token1".to_string(),
+        token_type: "bearer".to_string(),
+        expires_in: 3600,
+        refresh_token: "refresh1".to_string(),
+        scope: "read".to_string(),
+    };
+
+    let response2 = AuthResponse {
+        access_token: "token1".to_string(),
+        token_type: "bearer".to_string(),
+        expires_in: 3600,
+        refresh_token: "refresh1".to_string(),
+        scope: "read".to_string(),
+    };
+
+    let response3 = AuthResponse {
+        access_token: "token2".to_string(),
+        token_type: "bearer".to_string(),
+        expires_in: 3600,
+        refresh_token: "refresh1".to_string(),
+        scope: "read".to_string(),
+    };
+
+    assert_eq!(response1, response2);
+    assert_ne!(response1, response3);
+}
+
+#[test]
+fn test_hello_response_equality() {
+    let response1 = HelloResponse {
+        version: "2.0.0".to_string(),
+    };
+    let response2 = HelloResponse {
+        version: "2.0.0".to_string(),
+    };
+    let response3 = HelloResponse {
+        version: "2.1.0".to_string(),
+    };
+
+    assert_eq!(response1, response2);
+    assert_ne!(response1, response3);
+}
+
+#[test]
+fn test_test_response_equality() {
+    let response1 = TestResponse {
+        version: "1.2.26".to_string(),
+    };
+    let response2 = TestResponse {
+        version: "1.2.26".to_string(),
+    };
+    let response3 = TestResponse {
+        version: "1.2.30".to_string(),
+    };
+
+    assert_eq!(response1, response2);
+    assert_ne!(response1, response3);
+}
