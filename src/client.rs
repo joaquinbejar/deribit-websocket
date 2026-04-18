@@ -1442,6 +1442,7 @@ fn instrument_from_channel(channel: &str) -> Option<String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     //! Reconciliation tests for `subscribe` / `unsubscribe` (issue #62).
     //!
