@@ -73,10 +73,10 @@ impl WebSocketConfig {
     /// Construct a configuration from environment variables, propagating
     /// parse errors for any user-supplied URL.
     ///
-    /// Loads `.env` if present, reads `DERIBIT_WS_URL` (falling back to
-    /// [`constants::PRODUCTION_WS_URL`] when unset), and parses it. All other
-    /// fields follow the same env-or-default strategy as [`Default`] but
-    /// never fail.
+    /// Loads `.env` once via [`Self::load_env`], reads `DERIBIT_WS_URL`
+    /// (falling back to [`constants::PRODUCTION_WS_URL`] when unset), and
+    /// parses it. All other fields follow the same env-or-default strategy as
+    /// [`Default`] but never fail.
     ///
     /// Prefer this over [`Default::default`] when the caller needs to surface
     /// an invalid `DERIBIT_WS_URL` as an error instead of silently falling
@@ -87,9 +87,7 @@ impl WebSocketConfig {
     /// Returns [`url::ParseError`] when `DERIBIT_WS_URL` is set to a value
     /// that cannot be parsed as a URL.
     pub fn try_new() -> Result<Self, url::ParseError> {
-        // Load .env if present; ignore missing-file errors.
-        let _ = dotenv::dotenv();
-
+        Self::load_env();
         let ws_url_str =
             env::var("DERIBIT_WS_URL").unwrap_or_else(|_| constants::PRODUCTION_WS_URL.to_string());
         let ws_url = Url::parse(&ws_url_str)?;
@@ -99,27 +97,36 @@ impl WebSocketConfig {
     /// Create a new configuration with a custom URL.
     ///
     /// Non-URL fields are populated from environment variables using the
-    /// same rules as [`Default`]; only the URL is overridden.
+    /// same rules as [`Default`]; only the URL is overridden. `.env` is
+    /// loaded once via [`Self::load_env`] before any env var is read.
     ///
     /// # Errors
     ///
     /// Returns [`url::ParseError`] when `url` cannot be parsed.
     pub fn with_url(url: &str) -> Result<Self, url::ParseError> {
+        Self::load_env();
         let ws_url = Url::parse(url)?;
-        // `from_parts` loads `.env` and reads every non-URL env var.
         Ok(Self::from_parts(ws_url))
+    }
+
+    /// Centralised `.env` loader for every public constructor.
+    ///
+    /// Idempotent and harmless when called multiple times per process. Every
+    /// public entry point ([`Self::try_new`], [`Self::with_url`], and
+    /// [`Default::default`] via `try_new`) calls this exactly once before
+    /// reading any env var, so [`Self::from_parts`] can assume the environment
+    /// is already loaded.
+    fn load_env() {
+        let _ = dotenv::dotenv();
     }
 
     /// Private helper: populate every field except `ws_url` from environment
     /// variables (with sensible defaults) and combine them with the given URL.
     ///
-    /// `.env` loading is attempted here so every public constructor picks up
-    /// local overrides without having to duplicate the call.
+    /// The caller is responsible for calling [`Self::load_env`] beforehand so
+    /// that `.env` overrides are visible to `std::env::var`. Every public
+    /// constructor satisfies this invariant.
     fn from_parts(ws_url: Url) -> Self {
-        // Load environment variables from .env file if it exists. Idempotent
-        // and harmless when called more than once per process.
-        let _ = dotenv::dotenv();
-
         let heartbeat_interval = env::var("DERIBIT_HEARTBEAT_INTERVAL")
             .ok()
             .and_then(|s| s.parse().ok())

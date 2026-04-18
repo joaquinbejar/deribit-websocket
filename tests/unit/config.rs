@@ -5,13 +5,18 @@ use deribit_websocket::constants;
 use std::time::Duration;
 
 #[test]
+#[serial_test::serial]
 fn test_default_config() {
-    let config = unsafe {
-        std::env::set_var("DERIBIT_WS_URL", "wss://www.deribit.com/ws/api/v2");
-        std::env::remove_var("DERIBIT_TEST_MODE");
-        std::env::remove_var("DERIBIT_RECONNECT_DELAY");
-        WebSocketConfig::default()
-    };
+    let _guard = DeribitEnvGuard::capture(&[
+        "DERIBIT_WS_URL",
+        "DERIBIT_TEST_MODE",
+        "DERIBIT_RECONNECT_DELAY",
+    ]);
+    DeribitEnvGuard::set("DERIBIT_WS_URL", "wss://www.deribit.com/ws/api/v2");
+    DeribitEnvGuard::remove("DERIBIT_TEST_MODE");
+    DeribitEnvGuard::remove("DERIBIT_RECONNECT_DELAY");
+
+    let config = WebSocketConfig::default();
 
     assert_eq!(config.ws_url.as_str(), "wss://www.deribit.com/ws/api/v2");
     assert_eq!(config.heartbeat_interval, Duration::from_secs(30));
@@ -48,16 +53,21 @@ fn test_config_builder_pattern() {
 }
 
 #[test]
+#[serial_test::serial]
 fn test_config_chaining() {
-    let config = unsafe {
-        std::env::set_var("DERIBIT_WS_URL", "wss://www.deribit.com/ws/api/v2");
-        std::env::remove_var("DERIBIT_TEST_MODE");
-        std::env::remove_var("DERIBIT_RECONNECT_DELAY");
-        WebSocketConfig::default()
-    }
-    .with_heartbeat_interval(Duration::from_secs(45))
-    .with_max_reconnect_attempts(3)
-    .with_reconnect_delay(Duration::from_millis(500));
+    let _guard = DeribitEnvGuard::capture(&[
+        "DERIBIT_WS_URL",
+        "DERIBIT_TEST_MODE",
+        "DERIBIT_RECONNECT_DELAY",
+    ]);
+    DeribitEnvGuard::set("DERIBIT_WS_URL", "wss://www.deribit.com/ws/api/v2");
+    DeribitEnvGuard::remove("DERIBIT_TEST_MODE");
+    DeribitEnvGuard::remove("DERIBIT_RECONNECT_DELAY");
+
+    let config = WebSocketConfig::default()
+        .with_heartbeat_interval(Duration::from_secs(45))
+        .with_max_reconnect_attempts(3)
+        .with_reconnect_delay(Duration::from_millis(500));
 
     assert_eq!(config.ws_url.as_str(), "wss://www.deribit.com/ws/api/v2");
     assert_eq!(config.heartbeat_interval, Duration::from_secs(45));
@@ -170,48 +180,67 @@ fn test_config_get_credentials_some() {
 }
 
 // =============================================================================
-// Fallible constructor + Default fallback tests (Issue #48)
+// Env-mutation guard + fallible constructor tests (Issue #48)
 //
-// These tests mutate the `DERIBIT_WS_URL` environment variable, so they are
-// serialised to prevent cross-test races. The process-global env is restored
-// to its original state at the end of each test via a guard.
+// Every test in this module that touches `DERIBIT_*` env vars is marked
+// `#[serial_test::serial]` under the same (default) key, so that the safety
+// precondition of `std::env::set_var`/`remove_var` — no concurrent env
+// mutation in this process — actually holds. `DeribitEnvGuard` captures the
+// previous value of each named var and restores it on drop, so mutations do
+// not leak between tests.
 // =============================================================================
 
-/// RAII guard that restores the previous value of `DERIBIT_WS_URL` on drop
-/// so one test's env mutation does not leak into the next one.
-struct WsUrlEnvGuard {
-    previous: Option<String>,
+/// RAII guard that captures the previous values of the supplied env vars and
+/// restores them on drop. Call `set`/`remove` to mutate tracked vars inside
+/// the guarded scope.
+///
+/// Every caller must be `#[serial_test::serial]`; that is the sole basis for
+/// the `unsafe` blocks below being sound.
+struct DeribitEnvGuard {
+    previous: Vec<(&'static str, Option<String>)>,
 }
 
-impl WsUrlEnvGuard {
-    fn capture() -> Self {
+impl DeribitEnvGuard {
+    fn capture(vars: &[&'static str]) -> Self {
         Self {
-            previous: std::env::var("DERIBIT_WS_URL").ok(),
+            previous: vars
+                .iter()
+                .map(|name| (*name, std::env::var(name).ok()))
+                .collect(),
         }
     }
 
-    fn set(value: &str) {
-        // SAFETY: tests carrying this guard are `#[serial_test::serial]`, so no
-        // other thread in this process mutates the env concurrently.
+    fn set(name: &str, value: &str) {
+        // SAFETY: every test using this guard is `#[serial_test::serial]`,
+        // so no other thread in this process mutates the env concurrently.
         unsafe {
-            std::env::set_var("DERIBIT_WS_URL", value);
+            std::env::set_var(name, value);
+        }
+    }
+
+    fn remove(name: &str) {
+        // SAFETY: see `DeribitEnvGuard::set`.
+        unsafe {
+            std::env::remove_var(name);
         }
     }
 }
 
-impl Drop for WsUrlEnvGuard {
+impl Drop for DeribitEnvGuard {
     fn drop(&mut self) {
-        match &self.previous {
-            Some(value) => {
-                // SAFETY: see `WsUrlEnvGuard::set`.
-                unsafe {
-                    std::env::set_var("DERIBIT_WS_URL", value);
+        for (name, previous) in &self.previous {
+            match previous {
+                Some(value) => {
+                    // SAFETY: see `DeribitEnvGuard::set`.
+                    unsafe {
+                        std::env::set_var(name, value);
+                    }
                 }
-            }
-            None => {
-                // SAFETY: see `WsUrlEnvGuard::set`.
-                unsafe {
-                    std::env::remove_var("DERIBIT_WS_URL");
+                None => {
+                    // SAFETY: see `DeribitEnvGuard::set`.
+                    unsafe {
+                        std::env::remove_var(name);
+                    }
                 }
             }
         }
@@ -221,8 +250,8 @@ impl Drop for WsUrlEnvGuard {
 #[test]
 #[serial_test::serial]
 fn test_try_new_returns_ok_with_valid_env_url() {
-    let _guard = WsUrlEnvGuard::capture();
-    WsUrlEnvGuard::set("wss://custom.example.com/ws");
+    let _guard = DeribitEnvGuard::capture(&["DERIBIT_WS_URL"]);
+    DeribitEnvGuard::set("DERIBIT_WS_URL", "wss://custom.example.com/ws");
 
     let result = WebSocketConfig::try_new();
     assert!(
@@ -238,8 +267,8 @@ fn test_try_new_returns_ok_with_valid_env_url() {
 #[test]
 #[serial_test::serial]
 fn test_try_new_returns_err_on_invalid_env_url() {
-    let _guard = WsUrlEnvGuard::capture();
-    WsUrlEnvGuard::set("not-a-valid-url");
+    let _guard = DeribitEnvGuard::capture(&["DERIBIT_WS_URL"]);
+    DeribitEnvGuard::set("DERIBIT_WS_URL", "not-a-valid-url");
 
     let result = WebSocketConfig::try_new();
     assert!(
@@ -251,8 +280,8 @@ fn test_try_new_returns_err_on_invalid_env_url() {
 #[test]
 #[serial_test::serial]
 fn test_default_falls_back_on_invalid_env_url() {
-    let _guard = WsUrlEnvGuard::capture();
-    WsUrlEnvGuard::set("not-a-valid-url");
+    let _guard = DeribitEnvGuard::capture(&["DERIBIT_WS_URL"]);
+    DeribitEnvGuard::set("DERIBIT_WS_URL", "not-a-valid-url");
 
     // Default must NEVER panic; it silently falls back to PRODUCTION_WS_URL.
     let config = WebSocketConfig::default();
