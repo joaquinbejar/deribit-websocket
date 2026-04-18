@@ -184,6 +184,12 @@ impl DeribitWebSocketClient {
     /// leave the local view untouched so the caller can retry without
     /// inconsistency.
     ///
+    /// The response is parsed and validated outside the
+    /// `subscription_manager` mutex so the lock is only held for the
+    /// `HashMap` mutations themselves, keeping the critical section
+    /// minimal under contention from `get_subscriptions`, concurrent
+    /// subscribes, or the notification consumer.
+    ///
     /// # Errors
     ///
     /// Returns [`WebSocketError::InvalidMessage`] if a `Success` response
@@ -199,9 +205,11 @@ impl DeribitWebSocketClient {
 
         let response = self.send_request(request).await?;
 
-        {
+        // Parse + validate the confirmed list outside the subscription
+        // mutex. Only acquire the lock once we have work to do.
+        if let Some(confirmed) = confirmed_channels(&response, "public/subscribe")? {
             let mut sub_manager = self.subscription_manager.lock().await;
-            apply_subscribe_confirmation(&mut sub_manager, &response)?;
+            add_confirmed_channels(&mut sub_manager, confirmed);
         }
 
         Ok(response)
@@ -216,6 +224,10 @@ impl DeribitWebSocketClient {
     /// [`SubscriptionManager`]. Transport failures and API-error responses
     /// leave the local view untouched so the caller can retry without
     /// inconsistency.
+    ///
+    /// The response is parsed and validated outside the
+    /// `subscription_manager` mutex; the lock is only held for the
+    /// `HashMap::remove` loop.
     ///
     /// # Errors
     ///
@@ -232,9 +244,11 @@ impl DeribitWebSocketClient {
 
         let response = self.send_request(request).await?;
 
-        {
+        // Parse + validate the confirmed list outside the subscription
+        // mutex. Only acquire the lock once we have work to do.
+        if let Some(confirmed) = confirmed_channels(&response, "public/unsubscribe")? {
             let mut sub_manager = self.subscription_manager.lock().await;
-            apply_unsubscribe_confirmation(&mut sub_manager, &response)?;
+            remove_confirmed_channels(&mut sub_manager, confirmed);
         }
 
         Ok(response)
@@ -1330,60 +1344,30 @@ impl Default for DeribitWebSocketClient {
     }
 }
 
-/// Apply a server-confirmed `public/subscribe` response to `manager`.
+/// Add a pre-parsed list of server-confirmed channels to `manager`.
 ///
-/// Parses the JSON array carried by `response.result` as a list of channel
-/// names and adds each to the manager. Deribit's response is the set of
-/// channels actually accepted by the server — a possible strict subset of
-/// the requested list when individual channels are rejected (unknown
-/// channel, permission denied, rate limit). Only this reconciled set
-/// appears in the local view; the caller's input list is never consulted.
-///
-/// API-error responses ([`JsonRpcResult::Error`]) are a no-op: the caller
-/// returns them verbatim so the error surface is visible to the caller.
-///
-/// # Errors
-///
-/// Returns [`WebSocketError::InvalidMessage`] when a `Success` response
-/// carries a `result` value that cannot be parsed as `Vec<String>`.
-fn apply_subscribe_confirmation(
-    manager: &mut SubscriptionManager,
-    response: &JsonRpcResponse,
-) -> Result<(), WebSocketError> {
-    let confirmed = match confirmed_channels(response, "public/subscribe")? {
-        Some(list) => list,
-        None => return Ok(()),
-    };
-    for channel in confirmed {
+/// Computes the typed [`SubscriptionChannel`] variant and the instrument
+/// token for each channel and records the subscription in the manager.
+/// The caller is expected to invoke this while holding the
+/// `subscription_manager` lock; parsing and validation of the raw
+/// response should happen outside the lock (via [`confirmed_channels`]).
+fn add_confirmed_channels(manager: &mut SubscriptionManager, channels: Vec<String>) {
+    for channel in channels {
         let channel_type = SubscriptionChannel::from_string(&channel);
         let instrument = instrument_from_channel(&channel);
         manager.add_subscription(channel, channel_type, instrument);
     }
-    Ok(())
 }
 
-/// Apply a server-confirmed `public/unsubscribe` response to `manager`.
+/// Remove a pre-parsed list of server-confirmed channels from `manager`.
 ///
-/// Mirror of [`apply_subscribe_confirmation`] for the unsubscribe path:
-/// only the channels the server actually unsubscribed are removed from the
-/// local view. API-error responses are a no-op.
-///
-/// # Errors
-///
-/// Returns [`WebSocketError::InvalidMessage`] when a `Success` response
-/// carries a `result` value that cannot be parsed as `Vec<String>`.
-fn apply_unsubscribe_confirmation(
-    manager: &mut SubscriptionManager,
-    response: &JsonRpcResponse,
-) -> Result<(), WebSocketError> {
-    let confirmed = match confirmed_channels(response, "public/unsubscribe")? {
-        Some(list) => list,
-        None => return Ok(()),
-    };
-    for channel in confirmed {
+/// The caller is expected to invoke this while holding the
+/// `subscription_manager` lock; parsing and validation of the raw
+/// response should happen outside the lock (via [`confirmed_channels`]).
+fn remove_confirmed_channels(manager: &mut SubscriptionManager, channels: Vec<String>) {
+    for channel in channels {
         manager.remove_subscription(&channel);
     }
-    Ok(())
 }
 
 /// Extract the confirmed channel list from a subscribe/unsubscribe response.
@@ -1447,8 +1431,8 @@ mod tests {
     //! Reconciliation tests for `subscribe` / `unsubscribe` (issue #62).
     //!
     //! The bulk are stubbed-response tests that drive the pure sync
-    //! helpers ([`apply_subscribe_confirmation`] /
-    //! [`apply_unsubscribe_confirmation`]) directly with hand-crafted
+    //! helpers ([`confirmed_channels`] / [`add_confirmed_channels`] /
+    //! [`remove_confirmed_channels`]) directly with hand-crafted
     //! [`JsonRpcResponse`] values and a bare [`SubscriptionManager`]. One
     //! end-to-end test stands up a mock WebSocket server and exercises
     //! the full [`DeribitWebSocketClient::subscribe`] path to prove the
@@ -1474,19 +1458,45 @@ mod tests {
         )
     }
 
+    /// Drive the same control flow that `subscribe()` uses: parse the
+    /// response outside the lock, then hand the confirmed list to the
+    /// mutator. Returns `Ok(())` on success (including API-error
+    /// responses, which are a deliberate no-op) and the parse error on
+    /// malformed `Success` responses.
+    fn reconcile_subscribe(
+        manager: &mut SubscriptionManager,
+        response: &JsonRpcResponse,
+    ) -> Result<(), WebSocketError> {
+        if let Some(confirmed) = confirmed_channels(response, "public/subscribe")? {
+            add_confirmed_channels(manager, confirmed);
+        }
+        Ok(())
+    }
+
+    /// Mirror of [`reconcile_subscribe`] for the unsubscribe path.
+    fn reconcile_unsubscribe(
+        manager: &mut SubscriptionManager,
+        response: &JsonRpcResponse,
+    ) -> Result<(), WebSocketError> {
+        if let Some(confirmed) = confirmed_channels(response, "public/unsubscribe")? {
+            remove_confirmed_channels(manager, confirmed);
+        }
+        Ok(())
+    }
+
     // ---------------------------------------------------------------
-    // Stubbed-response unit tests: apply_subscribe_confirmation
+    // Stubbed-response unit tests: subscribe reconciliation
     // ---------------------------------------------------------------
 
     #[test]
-    fn test_apply_subscribe_confirmation_adds_only_server_confirmed_channels() {
+    fn test_reconcile_subscribe_adds_only_server_confirmed_channels() {
         // Core acceptance criterion for issue #62: caller requested two
         // channels, server accepted only one. Local view must reflect
         // the server-confirmed subset — never the input.
         let mut manager = SubscriptionManager::new();
         let response = success(json!(["ticker.BTC-PERPETUAL"]));
 
-        apply_subscribe_confirmation(&mut manager, &response)
+        reconcile_subscribe(&mut manager, &response)
             .expect("well-formed success response reconciles");
 
         let channels = manager.get_all_channels();
@@ -1498,14 +1508,13 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_subscribe_confirmation_happy_path_input_equals_response() {
+    fn test_reconcile_subscribe_happy_path_input_equals_response() {
         // Regression guard: when the server confirms everything the
         // caller asked for, every requested channel lands in the manager.
         let mut manager = SubscriptionManager::new();
         let response = success(json!(["ticker.BTC-PERPETUAL", "book.ETH-PERPETUAL.raw"]));
 
-        apply_subscribe_confirmation(&mut manager, &response)
-            .expect("happy-path response reconciles");
+        reconcile_subscribe(&mut manager, &response).expect("happy-path response reconciles");
 
         let mut channels = manager.get_all_channels();
         channels.sort();
@@ -1524,19 +1533,19 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_subscribe_confirmation_empty_result_is_noop() {
+    fn test_reconcile_subscribe_empty_result_is_noop() {
         // Server accepted zero of the requested channels. The function
         // succeeds but makes no entries.
         let mut manager = SubscriptionManager::new();
         let response = success(json!([] as [&str; 0]));
 
-        apply_subscribe_confirmation(&mut manager, &response).expect("empty confirmation is valid");
+        reconcile_subscribe(&mut manager, &response).expect("empty confirmation is valid");
 
         assert!(manager.get_all_channels().is_empty());
     }
 
     #[test]
-    fn test_apply_subscribe_confirmation_api_error_is_noop() {
+    fn test_reconcile_subscribe_api_error_is_noop() {
         // API-error responses are surfaced to the caller verbatim and
         // must leave the local view untouched so the caller can retry.
         let mut manager = SubscriptionManager::new();
@@ -1548,7 +1557,12 @@ mod tests {
         let before = manager.get_all_channels();
         let response = api_error(-32000, "subscription rejected");
 
-        apply_subscribe_confirmation(&mut manager, &response)
+        // Must resolve to Ok(None) — no mutation attempted.
+        assert!(
+            matches!(confirmed_channels(&response, "public/subscribe"), Ok(None)),
+            "api-error response must yield Ok(None)"
+        );
+        reconcile_subscribe(&mut manager, &response)
             .expect("api-error response must not return Err");
 
         assert_eq!(
@@ -1559,14 +1573,14 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_subscribe_confirmation_non_array_result_returns_invalid_message() {
+    fn test_reconcile_subscribe_non_array_result_returns_invalid_message() {
         // A `Success` whose `result` is not an array of strings is a
         // protocol violation — we surface it as `InvalidMessage` rather
         // than silently skipping reconciliation.
         let mut manager = SubscriptionManager::new();
         let response = success(json!({ "channels": ["ticker.BTC-PERPETUAL"] }));
 
-        let err = apply_subscribe_confirmation(&mut manager, &response)
+        let err = reconcile_subscribe(&mut manager, &response)
             .expect_err("object result must not parse as Vec<String>");
         assert!(
             matches!(err, WebSocketError::InvalidMessage(_)),
@@ -1580,11 +1594,11 @@ mod tests {
     }
 
     // ---------------------------------------------------------------
-    // Stubbed-response unit tests: apply_unsubscribe_confirmation
+    // Stubbed-response unit tests: unsubscribe reconciliation
     // ---------------------------------------------------------------
 
     #[test]
-    fn test_apply_unsubscribe_confirmation_removes_only_server_confirmed_channels() {
+    fn test_reconcile_unsubscribe_removes_only_server_confirmed_channels() {
         // Mirror of the subscribe subset test: two channels live in the
         // manager; the server confirms only one was unsubscribed. The
         // other must stay.
@@ -1601,7 +1615,7 @@ mod tests {
         );
         let response = success(json!(["ticker.BTC-PERPETUAL"]));
 
-        apply_unsubscribe_confirmation(&mut manager, &response)
+        reconcile_unsubscribe(&mut manager, &response)
             .expect("well-formed unsubscribe response reconciles");
 
         let channels = manager.get_all_channels();
@@ -1609,7 +1623,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_unsubscribe_confirmation_happy_path() {
+    fn test_reconcile_unsubscribe_happy_path() {
         // Regression guard: server confirms everything the caller asked
         // to drop; the manager ends empty.
         let mut manager = SubscriptionManager::new();
@@ -1625,14 +1639,13 @@ mod tests {
         );
         let response = success(json!(["ticker.BTC-PERPETUAL", "book.ETH-PERPETUAL.raw"]));
 
-        apply_unsubscribe_confirmation(&mut manager, &response)
-            .expect("happy-path unsubscribe reconciles");
+        reconcile_unsubscribe(&mut manager, &response).expect("happy-path unsubscribe reconciles");
 
         assert!(manager.get_all_channels().is_empty());
     }
 
     #[test]
-    fn test_apply_unsubscribe_confirmation_api_error_is_noop() {
+    fn test_reconcile_unsubscribe_api_error_is_noop() {
         let mut manager = SubscriptionManager::new();
         manager.add_subscription(
             "ticker.BTC-PERPETUAL".to_string(),
@@ -1642,7 +1655,7 @@ mod tests {
         let before = manager.get_all_channels();
         let response = api_error(-32000, "unsubscribe rejected");
 
-        apply_unsubscribe_confirmation(&mut manager, &response)
+        reconcile_unsubscribe(&mut manager, &response)
             .expect("api-error response must not return Err");
 
         assert_eq!(
@@ -1653,7 +1666,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_unsubscribe_confirmation_non_array_result_returns_invalid_message() {
+    fn test_reconcile_unsubscribe_non_array_result_returns_invalid_message() {
         let mut manager = SubscriptionManager::new();
         manager.add_subscription(
             "ticker.BTC-PERPETUAL".to_string(),
@@ -1662,7 +1675,7 @@ mod tests {
         );
         let response = success(json!("not an array"));
 
-        let err = apply_unsubscribe_confirmation(&mut manager, &response)
+        let err = reconcile_unsubscribe(&mut manager, &response)
             .expect_err("string result must not parse as Vec<String>");
         assert!(
             matches!(err, WebSocketError::InvalidMessage(_)),
