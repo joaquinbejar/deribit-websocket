@@ -30,4 +30,13 @@ pub enum WebSocketError {
     #[error("API error {0}: {1}")]
     /// API error with code and message
     ApiError(i32, String),
+
+    #[error("Operation timed out: {0}")]
+    /// Operation timed out (e.g., `send_request` awaiting a matching response)
+    Timeout(String),
+
+    #[error("Dispatcher task is not running")]
+    /// The background dispatcher task is not running (never started, shut
+    /// down, or panicked). No further I/O can be performed through it.
+    DispatcherDead,
 }
