@@ -4,6 +4,8 @@ use std::env;
 use std::time::Duration;
 use url::Url;
 
+use crate::constants;
+
 /// WebSocket client configuration
 #[derive(Debug, Clone)]
 pub struct WebSocketConfig {
@@ -50,15 +52,73 @@ pub struct WebSocketConfig {
 
 impl Default for WebSocketConfig {
     fn default() -> Self {
-        // Load environment variables from .env file if it exists
-        {
-            if dotenv::dotenv().is_err() {
-                // .env file not found or error loading, continue with system env vars
-            }
-        }
+        Self::try_new().unwrap_or_else(|_| {
+            // Reached only when a user-supplied `DERIBIT_WS_URL` is invalid.
+            // Fall back to the compile-time constant
+            // [`constants::PRODUCTION_WS_URL`], whose parse-ability is locked
+            // by the `test_production_ws_url_parses` unit test — making this
+            // branch unreachable in practice.
+            #[allow(
+                clippy::expect_used,
+                reason = "PRODUCTION_WS_URL is a compile-time constant validated by test_production_ws_url_parses"
+            )]
+            let ws_url = Url::parse(constants::PRODUCTION_WS_URL)
+                .expect("PRODUCTION_WS_URL is a compile-time constant validated by tests");
+            Self::from_parts(ws_url)
+        })
+    }
+}
 
-        let ws_url = env::var("DERIBIT_WS_URL")
-            .unwrap_or_else(|_| "wss://www.deribit.com/ws/api/v2".to_string());
+impl WebSocketConfig {
+    /// Construct a configuration from environment variables, propagating
+    /// parse errors for any user-supplied URL.
+    ///
+    /// Loads `.env` if present, reads `DERIBIT_WS_URL` (falling back to
+    /// [`constants::PRODUCTION_WS_URL`] when unset), and parses it. All other
+    /// fields follow the same env-or-default strategy as [`Default`] but
+    /// never fail.
+    ///
+    /// Prefer this over [`Default::default`] when the caller needs to surface
+    /// an invalid `DERIBIT_WS_URL` as an error instead of silently falling
+    /// back to the production URL.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`url::ParseError`] when `DERIBIT_WS_URL` is set to a value
+    /// that cannot be parsed as a URL.
+    pub fn try_new() -> Result<Self, url::ParseError> {
+        // Load .env if present; ignore missing-file errors.
+        let _ = dotenv::dotenv();
+
+        let ws_url_str =
+            env::var("DERIBIT_WS_URL").unwrap_or_else(|_| constants::PRODUCTION_WS_URL.to_string());
+        let ws_url = Url::parse(&ws_url_str)?;
+        Ok(Self::from_parts(ws_url))
+    }
+
+    /// Create a new configuration with a custom URL.
+    ///
+    /// Non-URL fields are populated from environment variables using the
+    /// same rules as [`Default`]; only the URL is overridden.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`url::ParseError`] when `url` cannot be parsed.
+    pub fn with_url(url: &str) -> Result<Self, url::ParseError> {
+        let ws_url = Url::parse(url)?;
+        // `from_parts` loads `.env` and reads every non-URL env var.
+        Ok(Self::from_parts(ws_url))
+    }
+
+    /// Private helper: populate every field except `ws_url` from environment
+    /// variables (with sensible defaults) and combine them with the given URL.
+    ///
+    /// `.env` loading is attempted here so every public constructor picks up
+    /// local overrides without having to duplicate the call.
+    fn from_parts(ws_url: Url) -> Self {
+        // Load environment variables from .env file if it exists. Idempotent
+        // and harmless when called more than once per process.
+        let _ = dotenv::dotenv();
 
         let heartbeat_interval = env::var("DERIBIT_HEARTBEAT_INTERVAL")
             .ok()
@@ -115,11 +175,7 @@ impl Default for WebSocketConfig {
             .unwrap_or(64);
 
         Self {
-            // TODO(#48): Replace Default with a fallible constructor so this
-            // hard-coded fallback URL does not rely on an `.unwrap()`.
-            #[allow(clippy::unwrap_used)]
-            ws_url: Url::parse(&ws_url)
-                .unwrap_or_else(|_| Url::parse("wss://www.deribit.com/ws/api/v2").unwrap()),
+            ws_url,
             heartbeat_interval,
             max_reconnect_attempts,
             reconnect_delay,
@@ -133,16 +189,6 @@ impl Default for WebSocketConfig {
             notification_channel_capacity,
             dispatcher_command_capacity,
         }
-    }
-}
-
-impl WebSocketConfig {
-    /// Create a new configuration with custom URL
-    pub fn with_url(url: &str) -> Result<Self, url::ParseError> {
-        Ok(Self {
-            ws_url: Url::parse(url)?,
-            ..Default::default()
-        })
     }
 
     /// Set heartbeat interval

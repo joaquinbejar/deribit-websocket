@@ -1,6 +1,7 @@
 //! Unit tests for config module
 
 use deribit_websocket::config::WebSocketConfig;
+use deribit_websocket::constants;
 use std::time::Duration;
 
 #[test]
@@ -166,4 +167,114 @@ fn test_config_get_credentials_some() {
     let (id, secret) = creds.unwrap();
     assert_eq!(id, "client_id");
     assert_eq!(secret, "client_secret");
+}
+
+// =============================================================================
+// Fallible constructor + Default fallback tests (Issue #48)
+//
+// These tests mutate the `DERIBIT_WS_URL` environment variable, so they are
+// serialised to prevent cross-test races. The process-global env is restored
+// to its original state at the end of each test via a guard.
+// =============================================================================
+
+/// RAII guard that restores the previous value of `DERIBIT_WS_URL` on drop
+/// so one test's env mutation does not leak into the next one.
+struct WsUrlEnvGuard {
+    previous: Option<String>,
+}
+
+impl WsUrlEnvGuard {
+    fn capture() -> Self {
+        Self {
+            previous: std::env::var("DERIBIT_WS_URL").ok(),
+        }
+    }
+
+    fn set(value: &str) {
+        // SAFETY: tests carrying this guard are `#[serial_test::serial]`, so no
+        // other thread in this process mutates the env concurrently.
+        unsafe {
+            std::env::set_var("DERIBIT_WS_URL", value);
+        }
+    }
+}
+
+impl Drop for WsUrlEnvGuard {
+    fn drop(&mut self) {
+        match &self.previous {
+            Some(value) => {
+                // SAFETY: see `WsUrlEnvGuard::set`.
+                unsafe {
+                    std::env::set_var("DERIBIT_WS_URL", value);
+                }
+            }
+            None => {
+                // SAFETY: see `WsUrlEnvGuard::set`.
+                unsafe {
+                    std::env::remove_var("DERIBIT_WS_URL");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+#[serial_test::serial]
+fn test_try_new_returns_ok_with_valid_env_url() {
+    let _guard = WsUrlEnvGuard::capture();
+    WsUrlEnvGuard::set("wss://custom.example.com/ws");
+
+    let result = WebSocketConfig::try_new();
+    assert!(
+        result.is_ok(),
+        "try_new should succeed with a valid user URL"
+    );
+    assert_eq!(
+        result.unwrap().ws_url.as_str(),
+        "wss://custom.example.com/ws"
+    );
+}
+
+#[test]
+#[serial_test::serial]
+fn test_try_new_returns_err_on_invalid_env_url() {
+    let _guard = WsUrlEnvGuard::capture();
+    WsUrlEnvGuard::set("not-a-valid-url");
+
+    let result = WebSocketConfig::try_new();
+    assert!(
+        result.is_err(),
+        "try_new must propagate url::ParseError for invalid env URL, got {result:?}"
+    );
+}
+
+#[test]
+#[serial_test::serial]
+fn test_default_falls_back_on_invalid_env_url() {
+    let _guard = WsUrlEnvGuard::capture();
+    WsUrlEnvGuard::set("not-a-valid-url");
+
+    // Default must NEVER panic; it silently falls back to PRODUCTION_WS_URL.
+    let config = WebSocketConfig::default();
+    assert_eq!(config.ws_url.as_str(), constants::PRODUCTION_WS_URL);
+}
+
+#[test]
+#[serial_test::serial]
+fn test_with_url_accepts_valid_url() {
+    // Regression guard for the `with_url` refactor (issue #48).
+    let custom = "wss://custom.example.com/ws";
+    let config = WebSocketConfig::with_url(custom).expect("valid URL must parse in with_url");
+    assert_eq!(config.ws_url.as_str(), custom);
+}
+
+#[test]
+#[serial_test::serial]
+fn test_with_url_returns_err_on_invalid_url() {
+    // Regression guard for the `with_url` refactor (issue #48).
+    let result = WebSocketConfig::with_url("not-a-valid-url");
+    assert!(
+        result.is_err(),
+        "with_url must propagate url::ParseError for invalid URL, got {result:?}"
+    );
 }

@@ -147,3 +147,29 @@ pub mod channels {
     /// User lock channel
     pub const USER_LOCK: &str = "user.lock";
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    use url::Url;
+
+    /// Locks the invariant that [`WebSocketConfig::default`] relies on in
+    /// `config.rs`: parsing [`PRODUCTION_WS_URL`] must succeed. If this test
+    /// ever fails, the `.expect` in `Default::default` becomes a panic.
+    #[test]
+    fn test_production_ws_url_parses() {
+        let url = Url::parse(PRODUCTION_WS_URL).expect("PRODUCTION_WS_URL must parse");
+        assert_eq!(url.scheme(), "wss");
+        assert_eq!(url.host_str(), Some("www.deribit.com"));
+        assert_eq!(url.path(), "/ws/api/v2");
+    }
+
+    #[test]
+    fn test_testnet_ws_url_parses() {
+        let url = Url::parse(TESTNET_WS_URL).expect("TESTNET_WS_URL must parse");
+        assert_eq!(url.scheme(), "wss");
+        assert_eq!(url.host_str(), Some("test.deribit.com"));
+        assert_eq!(url.path(), "/ws/api/v2");
+    }
+}
