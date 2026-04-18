@@ -1,17 +1,15 @@
 //! WebSocket client implementation for Deribit
 
 use std::sync::Arc;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::Mutex;
 
 use crate::model::SubscriptionChannel;
 use crate::{
     callback::MessageHandler,
     config::WebSocketConfig,
-    connection::WebSocketConnection,
+    connection::Dispatcher,
     error::WebSocketError,
-    message::{
-        notification::NotificationHandler, request::RequestBuilder, response::ResponseHandler,
-    },
+    message::request::RequestBuilder,
     model::{
         quote::*,
         subscription::SubscriptionManager,
@@ -21,48 +19,42 @@ use crate::{
 };
 
 /// WebSocket client for Deribit
+///
+/// Owns a shared, optional [`Dispatcher`] that runs the send/receive loop
+/// in a dedicated tokio task. All request/response multiplexing and
+/// notification routing happens inside that task; this façade only
+/// clones an `Arc<Dispatcher>` out of the slot and forwards calls to it.
 #[derive(Debug)]
 pub struct DeribitWebSocketClient {
     /// WebSocket configuration
     pub config: Arc<WebSocketConfig>,
-    connection: Arc<Mutex<WebSocketConnection>>,
+    /// Shared slot holding the live dispatcher, if any. The slot's mutex
+    /// is only held long enough to read/insert/remove the `Arc`, never
+    /// across a `send_request` await.
+    dispatcher: Arc<Mutex<Option<Arc<Dispatcher>>>>,
     /// WebSocket session
     pub session: Arc<WebSocketSession>,
     request_builder: Arc<Mutex<RequestBuilder>>,
-    #[allow(dead_code)]
-    response_handler: Arc<ResponseHandler>,
-    #[allow(dead_code)]
-    notification_handler: Arc<NotificationHandler>,
     subscription_manager: Arc<Mutex<SubscriptionManager>>,
-    #[allow(dead_code)]
-    message_sender: Option<mpsc::UnboundedSender<String>>,
-    #[allow(dead_code)]
-    message_receiver: Option<mpsc::UnboundedReceiver<String>>,
     message_handler: Option<MessageHandler>,
 }
 
 impl DeribitWebSocketClient {
     /// Create a new WebSocket client
     pub fn new(config: &WebSocketConfig) -> Result<Self, WebSocketError> {
-        let connection = Arc::new(Mutex::new(WebSocketConnection::new(config.ws_url.clone())));
         let subscription_manager = Arc::new(Mutex::new(SubscriptionManager::new()));
         let session = Arc::new(WebSocketSession::new(
             config.clone(),
             Arc::clone(&subscription_manager),
         ));
-        let (tx, rx) = mpsc::unbounded_channel();
 
         let config = Arc::new(config.clone());
         Ok(Self {
             config,
-            connection,
+            dispatcher: Arc::new(Mutex::new(None)),
             session,
             request_builder: Arc::new(Mutex::new(RequestBuilder::new())),
-            response_handler: Arc::new(ResponseHandler::new()),
-            notification_handler: Arc::new(NotificationHandler::new()),
             subscription_manager,
-            message_sender: Some(tx),
-            message_receiver: Some(rx),
             message_handler: None,
         })
     }
@@ -93,21 +85,50 @@ impl DeribitWebSocketClient {
     }
 
     /// Connect to the WebSocket server
+    ///
+    /// Spawns the dispatcher task that owns the WebSocket stream. If a
+    /// previous dispatcher is still installed, it is shut down first.
+    ///
+    /// The slot lock is held across the entire shutdown + connect_async +
+    /// install sequence so concurrent `connect()` calls are serialized.
+    /// Without this, two callers could each see an empty slot, each spawn
+    /// a dispatcher, and the loser's dispatcher task would leak. While a
+    /// connect is in flight, other client operations that touch the slot
+    /// (`send_request`, `disconnect`, `is_connected`) wait on the same
+    /// mutex — the desired semantics.
     pub async fn connect(&self) -> Result<(), WebSocketError> {
-        let mut connection = self.connection.lock().await;
-        connection.connect().await
+        let mut guard = self.dispatcher.lock().await;
+        if let Some(prev) = guard.take() {
+            let _ = prev.shutdown().await;
+        }
+        let dispatcher = Dispatcher::connect(
+            self.config.ws_url.clone(),
+            self.config.request_timeout,
+            self.config.notification_channel_capacity,
+            self.config.dispatcher_command_capacity,
+        )
+        .await?;
+        *guard = Some(Arc::new(dispatcher));
+        Ok(())
     }
 
     /// Disconnect from the WebSocket server
     pub async fn disconnect(&self) -> Result<(), WebSocketError> {
-        let mut connection = self.connection.lock().await;
-        connection.disconnect().await
+        // Take the Arc out under the lock so the lock is not held across
+        // the shutdown await.
+        let dispatcher = {
+            let mut guard = self.dispatcher.lock().await;
+            guard.take()
+        };
+        if let Some(dispatcher) = dispatcher {
+            dispatcher.shutdown().await?;
+        }
+        Ok(())
     }
 
-    /// Check if connected
+    /// Check if connected (i.e., a dispatcher is currently installed).
     pub async fn is_connected(&self) -> bool {
-        let connection = self.connection.lock().await;
-        connection.is_connected()
+        self.dispatcher.lock().await.is_some()
     }
 
     /// Authenticate with the server
@@ -268,57 +289,48 @@ impl DeribitWebSocketClient {
         }
     }
 
-    /// Send a JSON-RPC request
+    /// Send a JSON-RPC request and await the matching response.
+    ///
+    /// Forwards the request to the dispatcher, which serializes it,
+    /// writes it to the WebSocket sink, and routes the response back by
+    /// matching on the JSON-RPC `id` field. Notifications arriving
+    /// between the request and the response do not affect this call and
+    /// are routed to the notification channel instead.
     pub async fn send_request(
         &self,
         request: JsonRpcRequest,
     ) -> Result<JsonRpcResponse, WebSocketError> {
-        let message = serde_json::to_string(&request).map_err(|e| {
-            WebSocketError::InvalidMessage(format!("Failed to serialize request: {}", e))
-        })?;
-
-        let mut connection = self.connection.lock().await;
-        connection.send(message).await?;
-
-        // Wait for response (simplified - in real implementation would match by ID)
-        let response_text = connection.receive().await?;
-
-        // Try to parse as JSON-RPC response first, then handle notifications
-        let response: JsonRpcResponse = match serde_json::from_str(&response_text) {
-            Ok(resp) => resp,
-            Err(e) => {
-                // Check if this might be a notification (missing id field)
-                if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&response_text)
-                    && json_val.get("method").is_some()
-                    && json_val.get("id").is_none()
-                {
-                    // This is a notification, create a synthetic response
-                    return Ok(JsonRpcResponse {
-                        jsonrpc: "2.0".to_string(),
-                        id: serde_json::Value::Null,
-                        result: crate::model::JsonRpcResult::Success { result: json_val },
-                    });
-                }
-                return Err(WebSocketError::InvalidMessage(format!(
-                    "Failed to parse response: {}",
-                    e
-                )));
-            }
+        // Clone the Arc<Dispatcher> out under the short-lived slot lock,
+        // then drop the guard before awaiting on the dispatcher. This
+        // keeps the per-client mutex off the hot path so concurrent
+        // send_request calls do not serialize against each other.
+        let dispatcher = {
+            let guard = self.dispatcher.lock().await;
+            guard
+                .as_ref()
+                .map(Arc::clone)
+                .ok_or(WebSocketError::ConnectionClosed)?
         };
-
-        Ok(response)
+        dispatcher.send_request(request).await
     }
 
-    /// Send a raw message
-    pub async fn send_message(&self, message: String) -> Result<(), WebSocketError> {
-        let mut connection = self.connection.lock().await;
-        connection.send(message).await
-    }
-
-    /// Receive a message
+    /// Receive the next notification (or unmatched frame) from the server.
+    ///
+    /// Returns [`WebSocketError::ConnectionClosed`] if the dispatcher is
+    /// not running, or if its notification channel has been drained and
+    /// closed.
     pub async fn receive_message(&self) -> Result<String, WebSocketError> {
-        let mut connection = self.connection.lock().await;
-        connection.receive().await
+        let dispatcher = {
+            let guard = self.dispatcher.lock().await;
+            guard
+                .as_ref()
+                .map(Arc::clone)
+                .ok_or(WebSocketError::ConnectionClosed)?
+        };
+        dispatcher
+            .next_notification()
+            .await
+            .ok_or(WebSocketError::ConnectionClosed)
     }
 
     /// Get active subscriptions

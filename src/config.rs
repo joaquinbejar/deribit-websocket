@@ -27,6 +27,25 @@ pub struct WebSocketConfig {
     pub client_id: Option<String>,
     /// Client secret for authentication
     pub client_secret: Option<String>,
+    /// Per-request timeout for [`DeribitWebSocketClient::send_request`].
+    ///
+    /// Every call that awaits a matching JSON-RPC response is bounded by
+    /// this duration. If the response does not arrive in time, the call
+    /// returns [`WebSocketError::Timeout`].
+    pub request_timeout: Duration,
+    /// Notification channel capacity (frames buffered for the consumer).
+    ///
+    /// This is the depth of the bounded `mpsc` that carries server-pushed
+    /// notifications (and any unmatched frames) from the dispatcher task
+    /// to [`DeribitWebSocketClient::receive_message`] /
+    /// `start_message_processing_loop`. Slow consumers apply back-pressure
+    /// on the dispatcher.
+    pub notification_channel_capacity: usize,
+    /// Dispatcher command channel capacity (in-flight outbound commands).
+    ///
+    /// Caps the number of queued outbound commands (request sends and
+    /// shutdown) waiting to be processed by the dispatcher task.
+    pub dispatcher_command_capacity: usize,
 }
 
 impl Default for WebSocketConfig {
@@ -79,6 +98,22 @@ impl Default for WebSocketConfig {
         let client_id = env::var("DERIBIT_CLIENT_ID").ok();
         let client_secret = env::var("DERIBIT_CLIENT_SECRET").ok();
 
+        let request_timeout = env::var("DERIBIT_REQUEST_TIMEOUT")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .map(Duration::from_secs)
+            .unwrap_or_else(|| Duration::from_secs(30));
+
+        let notification_channel_capacity = env::var("DERIBIT_NOTIFICATION_CAPACITY")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(1024);
+
+        let dispatcher_command_capacity = env::var("DERIBIT_DISPATCHER_CAPACITY")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(64);
+
         Self {
             ws_url: Url::parse(&ws_url)
                 .unwrap_or_else(|_| Url::parse("wss://www.deribit.com/ws/api/v2").unwrap()),
@@ -91,6 +126,9 @@ impl Default for WebSocketConfig {
             test_mode,
             client_id,
             client_secret,
+            request_timeout,
+            notification_channel_capacity,
+            dispatcher_command_capacity,
         }
     }
 }
@@ -176,5 +214,32 @@ impl WebSocketConfig {
             (Some(id), Some(secret)) => Some((id, secret)),
             _ => None,
         }
+    }
+
+    /// Set the per-request timeout awaiting a matching JSON-RPC response.
+    #[must_use]
+    pub fn with_request_timeout(mut self, timeout: Duration) -> Self {
+        self.request_timeout = timeout;
+        self
+    }
+
+    /// Set the notification channel capacity.
+    ///
+    /// This bounds the number of server-pushed frames buffered between the
+    /// dispatcher task and the consumer.
+    #[must_use]
+    pub fn with_notification_channel_capacity(mut self, capacity: usize) -> Self {
+        self.notification_channel_capacity = capacity;
+        self
+    }
+
+    /// Set the dispatcher command channel capacity.
+    ///
+    /// Caps the number of outbound commands queued waiting for the
+    /// dispatcher task to process them.
+    #[must_use]
+    pub fn with_dispatcher_command_capacity(mut self, capacity: usize) -> Self {
+        self.dispatcher_command_capacity = capacity;
+        self
     }
 }
