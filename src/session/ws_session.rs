@@ -68,8 +68,9 @@ impl WebSocketSession {
     /// Mark session as disconnected
     pub async fn mark_disconnected(&self) {
         self.set_state(ConnectionState::Disconnected).await;
-        // Deactivate all subscriptions
-        self.subscription_manager.lock().await.clear();
+        // Deactivate all subscriptions but preserve their entries so
+        // `reactivate_subscriptions` can restore them on reconnect.
+        self.subscription_manager.lock().await.deactivate_all();
     }
 
     /// Reactivate subscriptions after reconnection

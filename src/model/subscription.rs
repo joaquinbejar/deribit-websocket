@@ -119,6 +119,14 @@ impl SubscriptionManager {
         }
     }
 
+    /// Deactivate all subscriptions in place. Entries are preserved so a
+    /// later call to `reactivate_all` can restore them on reconnect.
+    pub fn deactivate_all(&mut self) {
+        for subscription in self.subscriptions.values_mut() {
+            subscription.active = false;
+        }
+    }
+
     /// Clear all subscriptions
     pub fn clear(&mut self) {
         self.subscriptions.clear();

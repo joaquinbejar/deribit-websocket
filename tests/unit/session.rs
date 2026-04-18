@@ -233,18 +233,19 @@ async fn test_client_mutation_visible_via_session() {
 }
 
 #[tokio::test]
-async fn test_session_mark_disconnected_clears_client_view() {
+async fn test_session_mark_disconnected_deactivates_client_view() {
     use deribit_websocket::client::DeribitWebSocketClient;
     use deribit_websocket::model::SubscriptionChannel;
 
     let config = WebSocketConfig::default();
     let client = DeribitWebSocketClient::new(&config).expect("client construction must succeed");
+    let channel = "ticker.BTC-PERPETUAL.100ms";
 
     {
         let client_handle = client.subscription_manager();
         let mut guard = client_handle.lock().await;
         guard.add_subscription(
-            "ticker.BTC-PERPETUAL.100ms".to_string(),
+            channel.to_string(),
             SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string()),
             Some("BTC-PERPETUAL".to_string()),
         );
@@ -254,9 +255,45 @@ async fn test_session_mark_disconnected_clears_client_view() {
 
     let client_handle = client.subscription_manager();
     let guard = client_handle.lock().await;
+    let sub = guard
+        .get_subscription(channel)
+        .expect("subscription must remain after mark_disconnected — entry preserved for reconnect");
     assert!(
-        guard.get_all_channels().is_empty(),
-        "session.mark_disconnected() must clear the client's view of subscriptions"
+        !sub.active,
+        "session.mark_disconnected() must mark subscriptions inactive, not remove them"
+    );
+}
+
+#[tokio::test]
+async fn test_disconnect_then_reactivate_restores_active_subscriptions() {
+    use deribit_websocket::client::DeribitWebSocketClient;
+    use deribit_websocket::model::SubscriptionChannel;
+
+    let config = WebSocketConfig::default();
+    let client = DeribitWebSocketClient::new(&config).expect("client construction must succeed");
+    let channel = "ticker.BTC-PERPETUAL.100ms";
+
+    {
+        let client_handle = client.subscription_manager();
+        let mut guard = client_handle.lock().await;
+        guard.add_subscription(
+            channel.to_string(),
+            SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string()),
+            Some("BTC-PERPETUAL".to_string()),
+        );
+    }
+
+    client.session.mark_disconnected().await;
+    client.session.reactivate_subscriptions().await;
+
+    let client_handle = client.subscription_manager();
+    let guard = client_handle.lock().await;
+    let sub = guard
+        .get_subscription(channel)
+        .expect("subscription must survive the disconnect/reactivate cycle");
+    assert!(
+        sub.active,
+        "reactivate_subscriptions() after mark_disconnected() must restore active=true"
     );
 }
 
