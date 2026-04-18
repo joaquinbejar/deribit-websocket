@@ -521,7 +521,8 @@ fn test_test_response_equality() {
 
 use deribit_websocket::error::WebSocketError;
 use deribit_websocket::model::{
-    CancelQuotesRequest, EditOrderRequest, MassQuoteRequest, MovePositionTrade, OrderRequest, Quote,
+    CancelQuotesRequest, EditOrderRequest, MassQuoteRequest, MmpGroupConfig, MovePositionTrade,
+    OrderRequest, Quote,
 };
 
 #[test]
@@ -661,5 +662,48 @@ fn test_build_move_positions_request_nan_amount_returns_serialization_error() {
     assert!(
         matches!(result, Err(WebSocketError::Serialization(_))),
         "NaN move_positions amount must propagate as Serialization error, got {result:?}"
+    );
+}
+
+#[test]
+fn test_build_set_mmp_config_request_nan_quantity_limit_returns_serialization_error() {
+    // `MmpGroupConfig::new` compares magnitudes with `>=` and `>`, both of
+    // which return false for NaN. That lets NaN slip past validation and into
+    // the wire format as a silent `null`. The builder must catch it.
+    let mut builder = RequestBuilder::new();
+    let config = MmpGroupConfig {
+        mmp_group: "btc_mm".to_string(),
+        quantity_limit: f64::NAN,
+        delta_limit: 1.0,
+        interval: 1_000,
+        frozen_time: 5_000,
+        enabled: true,
+    };
+
+    let result = builder.build_set_mmp_config_request(config);
+
+    assert!(
+        matches!(result, Err(WebSocketError::Serialization(_))),
+        "NaN quantity_limit must propagate as Serialization error, got {result:?}"
+    );
+}
+
+#[test]
+fn test_build_set_mmp_config_request_infinity_delta_limit_returns_serialization_error() {
+    let mut builder = RequestBuilder::new();
+    let config = MmpGroupConfig {
+        mmp_group: "btc_mm".to_string(),
+        quantity_limit: 10.0,
+        delta_limit: f64::INFINITY,
+        interval: 1_000,
+        frozen_time: 5_000,
+        enabled: true,
+    };
+
+    let result = builder.build_set_mmp_config_request(config);
+
+    assert!(
+        matches!(result, Err(WebSocketError::Serialization(_))),
+        "Infinity delta_limit must propagate as Serialization error, got {result:?}"
     );
 }

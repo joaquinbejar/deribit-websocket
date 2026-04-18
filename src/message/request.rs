@@ -285,7 +285,21 @@ impl RequestBuilder {
     }
 
     /// Build set MMP config request
-    pub fn build_set_mmp_config_request(&mut self, config: MmpGroupConfig) -> JsonRpcRequest {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WebSocketError::Serialization`] if `config.quantity_limit` or
+    /// `config.delta_limit` is `NaN` or `Infinity`. `MmpGroupConfig::new`
+    /// enforces magnitude invariants but NaN comparisons always return false
+    /// and silently bypass them, which is why the finite check is repeated
+    /// here.
+    pub fn build_set_mmp_config_request(
+        &mut self,
+        config: MmpGroupConfig,
+    ) -> Result<JsonRpcRequest, WebSocketError> {
+        check_finite("quantity_limit", config.quantity_limit)?;
+        check_finite("delta_limit", config.delta_limit)?;
+
         let mut params = serde_json::json!({
             "mmp_group": config.mmp_group,
             "quantity_limit": config.quantity_limit,
@@ -299,7 +313,7 @@ impl RequestBuilder {
             params["interval"] = serde_json::Value::Number(serde_json::Number::from(0));
         }
 
-        self.build_request("private/set_mmp_config", Some(params))
+        Ok(self.build_request("private/set_mmp_config", Some(params)))
     }
 
     /// Build get MMP config request

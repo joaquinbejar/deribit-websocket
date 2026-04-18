@@ -695,7 +695,7 @@ impl DeribitWebSocketClient {
     pub async fn set_mmp_config(&self, config: MmpGroupConfig) -> Result<(), WebSocketError> {
         let json_request = {
             let mut builder = self.request_builder.lock().await;
-            builder.build_set_mmp_config_request(config)
+            builder.build_set_mmp_config_request(config)?
         };
 
         let response = self.send_request(json_request).await?;
