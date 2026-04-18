@@ -173,59 +173,82 @@ impl DeribitWebSocketClient {
         }
     }
 
-    /// Subscribe to channels
+    /// Subscribe to channels.
     ///
-    /// Local subscription state is updated only after the server confirms
-    /// the subscribe with a `JsonRpcResult::Success`. Transport failures
-    /// and API errors leave the local view untouched. Server-side partial
-    /// success (the response `result` array may be shorter than the
-    /// requested channel list) is not yet reconciled — see follow-up
-    /// issue.
+    /// Local subscription state is reconciled against the server-confirmed
+    /// channel list carried by `response.result`, which may be a strict
+    /// subset of the requested channels when the server rejects individual
+    /// entries (unknown channel, permission denied, rate limit). Only the
+    /// channels the server actually acknowledged are added to the local
+    /// [`SubscriptionManager`]. Transport failures and API-error responses
+    /// leave the local view untouched so the caller can retry without
+    /// inconsistency.
+    ///
+    /// The response is parsed and validated outside the
+    /// `subscription_manager` mutex so the lock is only held for the
+    /// `HashMap` mutations themselves, keeping the critical section
+    /// minimal under contention from `get_subscriptions`, concurrent
+    /// subscribes, or the notification consumer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WebSocketError::InvalidMessage`] if a `Success` response
+    /// carries a `result` that is not a JSON array of channel strings.
     pub async fn subscribe(
         &self,
         channels: Vec<String>,
     ) -> Result<JsonRpcResponse, WebSocketError> {
         let request = {
             let mut builder = self.request_builder.lock().await;
-            builder.build_subscribe_request(channels.clone())
+            builder.build_subscribe_request(channels)
         };
 
         let response = self.send_request(request).await?;
 
-        if matches!(response.result, JsonRpcResult::Success { .. }) {
+        // Parse + validate the confirmed list outside the subscription
+        // mutex. Only acquire the lock once we have work to do.
+        if let Some(confirmed) = confirmed_channels(&response, "public/subscribe")? {
             let mut sub_manager = self.subscription_manager.lock().await;
-            for channel in channels {
-                let channel_type = self.parse_channel_type(&channel);
-                let instrument = self.extract_instrument(&channel);
-                sub_manager.add_subscription(channel, channel_type, instrument);
-            }
+            add_confirmed_channels(&mut sub_manager, confirmed);
         }
 
         Ok(response)
     }
 
-    /// Unsubscribe from channels
+    /// Unsubscribe from channels.
     ///
-    /// Local subscription state is updated only after the server confirms
-    /// the unsubscribe with a `JsonRpcResult::Success`. Transport failures
-    /// and API errors leave the local view untouched so the caller can
-    /// retry without inconsistency.
+    /// Local subscription state is reconciled against the server-confirmed
+    /// channel list carried by `response.result`, which may be a strict
+    /// subset of the requested channels. Only the channels the server
+    /// actually acknowledged are removed from the local
+    /// [`SubscriptionManager`]. Transport failures and API-error responses
+    /// leave the local view untouched so the caller can retry without
+    /// inconsistency.
+    ///
+    /// The response is parsed and validated outside the
+    /// `subscription_manager` mutex; the lock is only held for the
+    /// `HashMap::remove` loop.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WebSocketError::InvalidMessage`] if a `Success` response
+    /// carries a `result` that is not a JSON array of channel strings.
     pub async fn unsubscribe(
         &self,
         channels: Vec<String>,
     ) -> Result<JsonRpcResponse, WebSocketError> {
         let request = {
             let mut builder = self.request_builder.lock().await;
-            builder.build_unsubscribe_request(channels.clone())
+            builder.build_unsubscribe_request(channels)
         };
 
         let response = self.send_request(request).await?;
 
-        if matches!(response.result, JsonRpcResult::Success { .. }) {
+        // Parse + validate the confirmed list outside the subscription
+        // mutex. Only acquire the lock once we have work to do.
+        if let Some(confirmed) = confirmed_channels(&response, "public/unsubscribe")? {
             let mut sub_manager = self.subscription_manager.lock().await;
-            for channel in channels {
-                sub_manager.remove_subscription(&channel);
-            }
+            remove_confirmed_channels(&mut sub_manager, confirmed);
         }
 
         Ok(response)
@@ -1308,46 +1331,6 @@ impl DeribitWebSocketClient {
 
         Ok(())
     }
-
-    // Helper methods
-
-    /// Parse a channel string into a `SubscriptionChannel` variant
-    ///
-    /// Uses `SubscriptionChannel::from_string()` to properly detect all channel types.
-    /// Unknown channels are returned as `SubscriptionChannel::Unknown(String)`.
-    fn parse_channel_type(&self, channel: &str) -> SubscriptionChannel {
-        SubscriptionChannel::from_string(channel)
-    }
-
-    fn extract_instrument(&self, channel: &str) -> Option<String> {
-        let parts: Vec<&str> = channel.split('.').collect();
-        match parts.as_slice() {
-            ["ticker", instrument] | ["ticker", instrument, _] => Some(instrument.to_string()),
-            ["book", instrument, ..] => Some(instrument.to_string()),
-            ["trades", instrument, ..] => Some(instrument.to_string()),
-            ["chart", "trades", instrument, _] => Some(instrument.to_string()),
-            ["user", "changes", instrument, _] => Some(instrument.to_string()),
-            ["estimated_expiration_price", instrument] => Some(instrument.to_string()),
-            ["markprice", "options", instrument] => Some(instrument.to_string()),
-            ["perpetual", instrument, _] => Some(instrument.to_string()),
-            ["quote", instrument] => Some(instrument.to_string()),
-            ["incremental_ticker", instrument] => Some(instrument.to_string()),
-            ["deribit_price_index", index_name]
-            | ["deribit_price_ranking", index_name]
-            | ["deribit_price_statistics", index_name]
-            | ["deribit_volatility_index", index_name] => Some(index_name.to_string()),
-            ["instrument", "state", _kind, currency] => Some(currency.to_string()),
-            ["block_rfq", "trades", currency] => Some(currency.to_string()),
-            ["block_trade_confirmations", currency] => Some(currency.to_string()),
-            ["user", "mmp_trigger", index_name] => Some(index_name.to_string()),
-            ["platform_state"]
-            | ["platform_state", "public_methods_state"]
-            | ["block_trade_confirmations"]
-            | ["user", "access_log"]
-            | ["user", "lock"] => None,
-            _ => None,
-        }
-    }
 }
 
 impl Default for DeribitWebSocketClient {
@@ -1358,5 +1341,464 @@ impl Default for DeribitWebSocketClient {
         // Tracked separately for a fallible-only constructor redesign.
         #[allow(clippy::unwrap_used)]
         Self::new(&config).unwrap()
+    }
+}
+
+/// Add a pre-parsed list of server-confirmed channels to `manager`.
+///
+/// Computes the typed [`SubscriptionChannel`] variant and the instrument
+/// token for each channel and records the subscription in the manager.
+/// The caller is expected to invoke this while holding the
+/// `subscription_manager` lock; parsing and validation of the raw
+/// response should happen outside the lock (via [`confirmed_channels`]).
+fn add_confirmed_channels(manager: &mut SubscriptionManager, channels: Vec<String>) {
+    for channel in channels {
+        let channel_type = SubscriptionChannel::from_string(&channel);
+        let instrument = instrument_from_channel(&channel);
+        manager.add_subscription(channel, channel_type, instrument);
+    }
+}
+
+/// Remove a pre-parsed list of server-confirmed channels from `manager`.
+///
+/// The caller is expected to invoke this while holding the
+/// `subscription_manager` lock; parsing and validation of the raw
+/// response should happen outside the lock (via [`confirmed_channels`]).
+fn remove_confirmed_channels(manager: &mut SubscriptionManager, channels: Vec<String>) {
+    for channel in channels {
+        manager.remove_subscription(&channel);
+    }
+}
+
+/// Extract the confirmed channel list from a subscribe/unsubscribe response.
+///
+/// - `Success` with a JSON array of strings → `Ok(Some(list))`.
+/// - `Success` with any other shape → `Err(InvalidMessage)`.
+/// - `Error` → `Ok(None)`, signalling the caller to leave local state
+///   untouched. The caller is expected to return the [`JsonRpcResponse`]
+///   to its own caller so the API error surfaces.
+fn confirmed_channels(
+    response: &JsonRpcResponse,
+    method: &'static str,
+) -> Result<Option<Vec<String>>, WebSocketError> {
+    match &response.result {
+        JsonRpcResult::Success { result } => serde_json::from_value::<Vec<String>>(result.clone())
+            .map(Some)
+            .map_err(|e| {
+                WebSocketError::InvalidMessage(format!(
+                    "expected array of confirmed channel strings in {} response: {}",
+                    method, e
+                ))
+            }),
+        JsonRpcResult::Error { .. } => Ok(None),
+    }
+}
+
+/// Extract the instrument/currency/index token carried by a channel name.
+///
+/// Plain-function counterpart of `DeribitWebSocketClient::extract_instrument`
+/// so the reconciliation helpers can run without a client instance (and
+/// therefore be unit-tested in isolation). Keeps the same pattern-match
+/// shape as the method to avoid drift.
+fn instrument_from_channel(channel: &str) -> Option<String> {
+    let parts: Vec<&str> = channel.split('.').collect();
+    match parts.as_slice() {
+        ["ticker", instrument] | ["ticker", instrument, _] => Some((*instrument).to_string()),
+        ["book", instrument, ..] => Some((*instrument).to_string()),
+        ["trades", instrument, ..] => Some((*instrument).to_string()),
+        ["chart", "trades", instrument, _] => Some((*instrument).to_string()),
+        ["user", "changes", instrument, _] => Some((*instrument).to_string()),
+        ["estimated_expiration_price", instrument] => Some((*instrument).to_string()),
+        ["markprice", "options", instrument] => Some((*instrument).to_string()),
+        ["perpetual", instrument, _] => Some((*instrument).to_string()),
+        ["quote", instrument] => Some((*instrument).to_string()),
+        ["incremental_ticker", instrument] => Some((*instrument).to_string()),
+        ["deribit_price_index", index_name]
+        | ["deribit_price_ranking", index_name]
+        | ["deribit_price_statistics", index_name]
+        | ["deribit_volatility_index", index_name] => Some((*index_name).to_string()),
+        ["instrument", "state", _kind, currency] => Some((*currency).to_string()),
+        ["block_rfq", "trades", currency] => Some((*currency).to_string()),
+        ["block_trade_confirmations", currency] => Some((*currency).to_string()),
+        ["user", "mmp_trigger", index_name] => Some((*index_name).to_string()),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    //! Reconciliation tests for `subscribe` / `unsubscribe` (issue #62).
+    //!
+    //! The bulk are stubbed-response tests that drive the pure sync
+    //! helpers ([`confirmed_channels`] / [`add_confirmed_channels`] /
+    //! [`remove_confirmed_channels`]) directly with hand-crafted
+    //! [`JsonRpcResponse`] values and a bare [`SubscriptionManager`]. One
+    //! end-to-end test stands up a mock WebSocket server and exercises
+    //! the full [`DeribitWebSocketClient::subscribe`] path to prove the
+    //! acceptance criterion from the issue.
+    use super::*;
+    use crate::model::ws_types::JsonRpcError;
+    use serde_json::json;
+
+    /// Build a `Success` response carrying `result`.
+    fn success(result: serde_json::Value) -> JsonRpcResponse {
+        JsonRpcResponse::success(json!(1), result)
+    }
+
+    /// Build an `Error` response with a realistic Deribit-style shape.
+    fn api_error(code: i32, message: &str) -> JsonRpcResponse {
+        JsonRpcResponse::error(
+            json!(1),
+            JsonRpcError {
+                code,
+                message: message.to_string(),
+                data: None,
+            },
+        )
+    }
+
+    /// Drive the same control flow that `subscribe()` uses: parse the
+    /// response outside the lock, then hand the confirmed list to the
+    /// mutator. Returns `Ok(())` on success (including API-error
+    /// responses, which are a deliberate no-op) and the parse error on
+    /// malformed `Success` responses.
+    fn reconcile_subscribe(
+        manager: &mut SubscriptionManager,
+        response: &JsonRpcResponse,
+    ) -> Result<(), WebSocketError> {
+        if let Some(confirmed) = confirmed_channels(response, "public/subscribe")? {
+            add_confirmed_channels(manager, confirmed);
+        }
+        Ok(())
+    }
+
+    /// Mirror of [`reconcile_subscribe`] for the unsubscribe path.
+    fn reconcile_unsubscribe(
+        manager: &mut SubscriptionManager,
+        response: &JsonRpcResponse,
+    ) -> Result<(), WebSocketError> {
+        if let Some(confirmed) = confirmed_channels(response, "public/unsubscribe")? {
+            remove_confirmed_channels(manager, confirmed);
+        }
+        Ok(())
+    }
+
+    // ---------------------------------------------------------------
+    // Stubbed-response unit tests: subscribe reconciliation
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_reconcile_subscribe_adds_only_server_confirmed_channels() {
+        // Core acceptance criterion for issue #62: caller requested two
+        // channels, server accepted only one. Local view must reflect
+        // the server-confirmed subset — never the input.
+        let mut manager = SubscriptionManager::new();
+        let response = success(json!(["ticker.BTC-PERPETUAL"]));
+
+        reconcile_subscribe(&mut manager, &response)
+            .expect("well-formed success response reconciles");
+
+        let channels = manager.get_all_channels();
+        assert_eq!(channels, vec!["ticker.BTC-PERPETUAL".to_string()]);
+        assert!(
+            manager.get_subscription("ticker.INVALID").is_none(),
+            "rejected input channel must not leak into local state"
+        );
+    }
+
+    #[test]
+    fn test_reconcile_subscribe_happy_path_input_equals_response() {
+        // Regression guard: when the server confirms everything the
+        // caller asked for, every requested channel lands in the manager.
+        let mut manager = SubscriptionManager::new();
+        let response = success(json!(["ticker.BTC-PERPETUAL", "book.ETH-PERPETUAL.raw"]));
+
+        reconcile_subscribe(&mut manager, &response).expect("happy-path response reconciles");
+
+        let mut channels = manager.get_all_channels();
+        channels.sort();
+        assert_eq!(
+            channels,
+            vec![
+                "book.ETH-PERPETUAL.raw".to_string(),
+                "ticker.BTC-PERPETUAL".to_string(),
+            ]
+        );
+        // Instrument extraction should populate the typed side too.
+        let ticker = manager
+            .get_subscription("ticker.BTC-PERPETUAL")
+            .expect("ticker subscription tracked");
+        assert_eq!(ticker.instrument.as_deref(), Some("BTC-PERPETUAL"));
+    }
+
+    #[test]
+    fn test_reconcile_subscribe_empty_result_is_noop() {
+        // Server accepted zero of the requested channels. The function
+        // succeeds but makes no entries.
+        let mut manager = SubscriptionManager::new();
+        let response = success(json!([] as [&str; 0]));
+
+        reconcile_subscribe(&mut manager, &response).expect("empty confirmation is valid");
+
+        assert!(manager.get_all_channels().is_empty());
+    }
+
+    #[test]
+    fn test_reconcile_subscribe_api_error_is_noop() {
+        // API-error responses are surfaced to the caller verbatim and
+        // must leave the local view untouched so the caller can retry.
+        let mut manager = SubscriptionManager::new();
+        manager.add_subscription(
+            "ticker.BTC-PERPETUAL".to_string(),
+            SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string()),
+            Some("BTC-PERPETUAL".to_string()),
+        );
+        let before = manager.get_all_channels();
+        let response = api_error(-32000, "subscription rejected");
+
+        // Must resolve to Ok(None) — no mutation attempted.
+        assert!(
+            matches!(confirmed_channels(&response, "public/subscribe"), Ok(None)),
+            "api-error response must yield Ok(None)"
+        );
+        reconcile_subscribe(&mut manager, &response)
+            .expect("api-error response must not return Err");
+
+        assert_eq!(
+            manager.get_all_channels(),
+            before,
+            "api-error response must not mutate the manager"
+        );
+    }
+
+    #[test]
+    fn test_reconcile_subscribe_non_array_result_returns_invalid_message() {
+        // A `Success` whose `result` is not an array of strings is a
+        // protocol violation — we surface it as `InvalidMessage` rather
+        // than silently skipping reconciliation.
+        let mut manager = SubscriptionManager::new();
+        let response = success(json!({ "channels": ["ticker.BTC-PERPETUAL"] }));
+
+        let err = reconcile_subscribe(&mut manager, &response)
+            .expect_err("object result must not parse as Vec<String>");
+        assert!(
+            matches!(err, WebSocketError::InvalidMessage(_)),
+            "expected InvalidMessage, got {:?}",
+            err
+        );
+        assert!(
+            manager.get_all_channels().is_empty(),
+            "failed reconciliation must not partially mutate the manager"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // Stubbed-response unit tests: unsubscribe reconciliation
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_reconcile_unsubscribe_removes_only_server_confirmed_channels() {
+        // Mirror of the subscribe subset test: two channels live in the
+        // manager; the server confirms only one was unsubscribed. The
+        // other must stay.
+        let mut manager = SubscriptionManager::new();
+        manager.add_subscription(
+            "ticker.BTC-PERPETUAL".to_string(),
+            SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string()),
+            Some("BTC-PERPETUAL".to_string()),
+        );
+        manager.add_subscription(
+            "ticker.ETH-PERPETUAL".to_string(),
+            SubscriptionChannel::Ticker("ETH-PERPETUAL".to_string()),
+            Some("ETH-PERPETUAL".to_string()),
+        );
+        let response = success(json!(["ticker.BTC-PERPETUAL"]));
+
+        reconcile_unsubscribe(&mut manager, &response)
+            .expect("well-formed unsubscribe response reconciles");
+
+        let channels = manager.get_all_channels();
+        assert_eq!(channels, vec!["ticker.ETH-PERPETUAL".to_string()]);
+    }
+
+    #[test]
+    fn test_reconcile_unsubscribe_happy_path() {
+        // Regression guard: server confirms everything the caller asked
+        // to drop; the manager ends empty.
+        let mut manager = SubscriptionManager::new();
+        manager.add_subscription(
+            "ticker.BTC-PERPETUAL".to_string(),
+            SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string()),
+            Some("BTC-PERPETUAL".to_string()),
+        );
+        manager.add_subscription(
+            "book.ETH-PERPETUAL.raw".to_string(),
+            SubscriptionChannel::OrderBook("ETH-PERPETUAL".to_string()),
+            Some("ETH-PERPETUAL".to_string()),
+        );
+        let response = success(json!(["ticker.BTC-PERPETUAL", "book.ETH-PERPETUAL.raw"]));
+
+        reconcile_unsubscribe(&mut manager, &response).expect("happy-path unsubscribe reconciles");
+
+        assert!(manager.get_all_channels().is_empty());
+    }
+
+    #[test]
+    fn test_reconcile_unsubscribe_api_error_is_noop() {
+        let mut manager = SubscriptionManager::new();
+        manager.add_subscription(
+            "ticker.BTC-PERPETUAL".to_string(),
+            SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string()),
+            Some("BTC-PERPETUAL".to_string()),
+        );
+        let before = manager.get_all_channels();
+        let response = api_error(-32000, "unsubscribe rejected");
+
+        reconcile_unsubscribe(&mut manager, &response)
+            .expect("api-error response must not return Err");
+
+        assert_eq!(
+            manager.get_all_channels(),
+            before,
+            "api-error response must not mutate the manager"
+        );
+    }
+
+    #[test]
+    fn test_reconcile_unsubscribe_non_array_result_returns_invalid_message() {
+        let mut manager = SubscriptionManager::new();
+        manager.add_subscription(
+            "ticker.BTC-PERPETUAL".to_string(),
+            SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string()),
+            Some("BTC-PERPETUAL".to_string()),
+        );
+        let response = success(json!("not an array"));
+
+        let err = reconcile_unsubscribe(&mut manager, &response)
+            .expect_err("string result must not parse as Vec<String>");
+        assert!(
+            matches!(err, WebSocketError::InvalidMessage(_)),
+            "expected InvalidMessage, got {:?}",
+            err
+        );
+        assert_eq!(
+            manager.get_all_channels(),
+            vec!["ticker.BTC-PERPETUAL".to_string()],
+            "failed reconciliation must not partially mutate the manager"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // End-to-end mock WebSocket server test (acceptance criterion #1)
+    // ---------------------------------------------------------------
+
+    /// Spawn a single-shot mock WebSocket server on an ephemeral port.
+    ///
+    /// The `scenario` closure receives the split sink/stream for the one
+    /// accepted connection and drives the test-specific server-side
+    /// behaviour. Returns the bound address and a join handle the test
+    /// must await at the end to surface any panic from the task.
+    async fn spawn_mock_server<F, Fut>(
+        scenario: F,
+    ) -> (std::net::SocketAddr, tokio::task::JoinHandle<()>)
+    where
+        F: FnOnce(
+                futures_util::stream::SplitSink<
+                    tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+                    tokio_tungstenite::tungstenite::Message,
+                >,
+                futures_util::stream::SplitStream<
+                    tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+                >,
+            ) -> Fut
+            + Send
+            + 'static,
+        Fut: std::future::Future<Output = ()> + Send,
+    {
+        use futures_util::StreamExt;
+        use tokio::net::TcpListener;
+        use tokio_tungstenite::accept_async;
+
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind localhost ephemeral port");
+        let addr = listener
+            .local_addr()
+            .expect("read local addr of bound listener");
+        let handle = tokio::spawn(async move {
+            let (socket, _peer) = match listener.accept().await {
+                Ok(pair) => pair,
+                Err(_) => return,
+            };
+            let ws = match accept_async(socket).await {
+                Ok(ws) => ws,
+                Err(_) => return,
+            };
+            let (sink, stream) = ws.split();
+            scenario(sink, stream).await;
+        });
+        (addr, handle)
+    }
+
+    #[tokio::test]
+    async fn test_subscribe_reconciles_local_state_with_server_subset() {
+        // End-to-end proof of the issue #62 acceptance criterion:
+        //
+        //   client.subscribe(["ticker.INVALID", "ticker.BTC-PERPETUAL"])
+        //
+        // against a server that replies with `["ticker.BTC-PERPETUAL"]`
+        // leaves only BTC-PERPETUAL in the local manager.
+        use futures_util::{SinkExt, StreamExt};
+        use tokio_tungstenite::tungstenite::Message;
+
+        let (addr, server) = spawn_mock_server(|mut sink, mut stream| async move {
+            // Read the subscribe request, echo back only the BTC channel.
+            if let Some(Ok(Message::Text(t))) = stream.next().await {
+                let req: serde_json::Value =
+                    serde_json::from_str(&t).expect("server parses request");
+                let id = req.get("id").cloned().unwrap_or(serde_json::Value::Null);
+                let resp = json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": ["ticker.BTC-PERPETUAL"],
+                });
+                let _ = sink.send(Message::Text(resp.to_string().into())).await;
+            }
+            // Hold the socket open long enough for the client to read.
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        })
+        .await;
+
+        let config = WebSocketConfig::with_url(&format!("ws://{}/", addr)).expect("valid ws url");
+        let client = DeribitWebSocketClient::new(&config).expect("client construction");
+        client.connect().await.expect("client connects to mock");
+
+        let response = client
+            .subscribe(vec![
+                "ticker.INVALID".to_string(),
+                "ticker.BTC-PERPETUAL".to_string(),
+            ])
+            .await
+            .expect("subscribe returns the server-confirmed response");
+
+        // Server-confirmed response is surfaced verbatim.
+        let JsonRpcResult::Success { result } = response.result else {
+            panic!("expected Success result, got {:?}", response.result);
+        };
+        assert_eq!(result, json!(["ticker.BTC-PERPETUAL"]));
+
+        // Local manager reflects the server-confirmed subset — only BTC,
+        // never the rejected INVALID channel.
+        let manager = client.subscription_manager();
+        let channels = manager.lock().await.get_all_channels();
+        assert_eq!(
+            channels,
+            vec!["ticker.BTC-PERPETUAL".to_string()],
+            "local manager must drop rejected channels from the input"
+        );
+
+        client.disconnect().await.expect("client disconnects");
+        server.await.expect("server task did not panic");
     }
 }

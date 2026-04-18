@@ -95,32 +95,46 @@ fn test_client_debug() {
 
 #[test]
 fn test_client_parse_channel_type() {
-    let config = WebSocketConfig::default();
-    let _client = DeribitWebSocketClient::new(&config).unwrap();
+    // `SubscriptionChannel::from_string` is the sole parser used by the
+    // client's subscribe/unsubscribe reconciliation, so pin its behaviour
+    // for the channel formats the client ingests most frequently.
+    use deribit_websocket::model::SubscriptionChannel;
 
-    // Test channel parsing through subscription management
-    // This is an indirect test since parse_channel_type is private
-    let subscriptions = [
-        "ticker.BTC-PERPETUAL".to_string(),
-        "book.ETH-PERPETUAL.100ms".to_string(),
-        "trades.BTC-PERPETUAL".to_string(),
-    ];
-
-    // The client should be able to handle these channel formats
-    assert!(subscriptions.iter().all(|s| !s.is_empty()));
+    assert_eq!(
+        SubscriptionChannel::from_string("ticker.BTC-PERPETUAL"),
+        SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string())
+    );
+    assert_eq!(
+        SubscriptionChannel::from_string("book.ETH-PERPETUAL.raw"),
+        SubscriptionChannel::OrderBook("ETH-PERPETUAL".to_string())
+    );
+    assert_eq!(
+        SubscriptionChannel::from_string("trades.BTC-PERPETUAL.raw"),
+        SubscriptionChannel::Trades("BTC-PERPETUAL".to_string())
+    );
+    // Unknown channels round-trip through the catch-all variant.
+    assert!(SubscriptionChannel::from_string("totally.unknown.channel").is_unknown());
 }
 
 #[test]
 fn test_client_extract_instrument() {
-    let config = WebSocketConfig::default();
-    let _client = DeribitWebSocketClient::new(&config).unwrap();
+    // The canonical round-trip: build a channel from its typed variant and
+    // confirm the same string re-parses to the same variant. Keeps the
+    // instrument extraction honest against drift in either direction.
+    use deribit_websocket::model::SubscriptionChannel;
 
-    // Test instrument extraction through subscription management
-    let channels = [
-        "ticker.BTC-PERPETUAL".to_string(),
-        "book.ETH-PERPETUAL.100ms".to_string(),
-    ];
-
-    // The client should be able to handle instrument extraction
-    assert!(channels.iter().all(|s| s.contains('.')));
+    for original in [
+        SubscriptionChannel::Ticker("BTC-PERPETUAL".to_string()),
+        SubscriptionChannel::OrderBook("ETH-PERPETUAL".to_string()),
+        SubscriptionChannel::Trades("BTC-PERPETUAL".to_string()),
+        SubscriptionChannel::Quote("SOL-PERPETUAL".to_string()),
+    ] {
+        let channel_name = original.channel_name();
+        let reparsed = SubscriptionChannel::from_string(&channel_name);
+        assert_eq!(
+            original, reparsed,
+            "channel {} must survive a round-trip through from_string",
+            channel_name
+        );
+    }
 }
