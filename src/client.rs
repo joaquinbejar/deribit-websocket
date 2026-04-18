@@ -174,6 +174,13 @@ impl DeribitWebSocketClient {
     }
 
     /// Subscribe to channels
+    ///
+    /// Local subscription state is updated only after the server confirms
+    /// the subscribe with a `JsonRpcResult::Success`. Transport failures
+    /// and API errors leave the local view untouched. Server-side partial
+    /// success (the response `result` array may be shorter than the
+    /// requested channel list) is not yet reconciled — see follow-up
+    /// issue.
     pub async fn subscribe(
         &self,
         channels: Vec<String>,
@@ -183,18 +190,26 @@ impl DeribitWebSocketClient {
             builder.build_subscribe_request(channels.clone())
         };
 
-        // Update subscription manager
-        let mut sub_manager = self.subscription_manager.lock().await;
-        for channel in channels {
-            let channel_type = self.parse_channel_type(&channel);
-            let instrument = self.extract_instrument(&channel);
-            sub_manager.add_subscription(channel, channel_type, instrument);
+        let response = self.send_request(request).await?;
+
+        if matches!(response.result, JsonRpcResult::Success { .. }) {
+            let mut sub_manager = self.subscription_manager.lock().await;
+            for channel in channels {
+                let channel_type = self.parse_channel_type(&channel);
+                let instrument = self.extract_instrument(&channel);
+                sub_manager.add_subscription(channel, channel_type, instrument);
+            }
         }
 
-        self.send_request(request).await
+        Ok(response)
     }
 
     /// Unsubscribe from channels
+    ///
+    /// Local subscription state is updated only after the server confirms
+    /// the unsubscribe with a `JsonRpcResult::Success`. Transport failures
+    /// and API errors leave the local view untouched so the caller can
+    /// retry without inconsistency.
     pub async fn unsubscribe(
         &self,
         channels: Vec<String>,
@@ -204,13 +219,16 @@ impl DeribitWebSocketClient {
             builder.build_unsubscribe_request(channels.clone())
         };
 
-        // Update subscription manager
-        let mut sub_manager = self.subscription_manager.lock().await;
-        for channel in channels {
-            sub_manager.remove_subscription(&channel);
+        let response = self.send_request(request).await?;
+
+        if matches!(response.result, JsonRpcResult::Success { .. }) {
+            let mut sub_manager = self.subscription_manager.lock().await;
+            for channel in channels {
+                sub_manager.remove_subscription(&channel);
+            }
         }
 
-        self.send_request(request).await
+        Ok(response)
     }
 
     /// Unsubscribe from all public channels
@@ -233,12 +251,13 @@ impl DeribitWebSocketClient {
 
         let response = self.send_request(request).await?;
 
-        // Clear subscription manager
-        let mut sub_manager = self.subscription_manager.lock().await;
-        sub_manager.clear();
-
+        // Clear the local subscription manager only after the server
+        // confirms success. On API error (e.g. not authenticated) we
+        // preserve the local view so the caller can retry without
+        // inconsistency.
         match response.result {
             JsonRpcResult::Success { result } => {
+                self.subscription_manager.lock().await.clear();
                 result.as_str().map(String::from).ok_or_else(|| {
                     WebSocketError::InvalidMessage(
                         "Expected string result from unsubscribe_all".to_string(),
@@ -271,12 +290,12 @@ impl DeribitWebSocketClient {
 
         let response = self.send_request(request).await?;
 
-        // Clear subscription manager
-        let mut sub_manager = self.subscription_manager.lock().await;
-        sub_manager.clear();
-
+        // Clear the local subscription manager only after the server
+        // confirms success. On API error we preserve the local view so
+        // the caller can retry without inconsistency.
         match response.result {
             JsonRpcResult::Success { result } => {
+                self.subscription_manager.lock().await.clear();
                 result.as_str().map(String::from).ok_or_else(|| {
                     WebSocketError::InvalidMessage(
                         "Expected string result from unsubscribe_all".to_string(),
