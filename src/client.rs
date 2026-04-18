@@ -88,18 +88,19 @@ impl DeribitWebSocketClient {
     ///
     /// Spawns the dispatcher task that owns the WebSocket stream. If a
     /// previous dispatcher is still installed, it is shut down first.
+    ///
+    /// The slot lock is held across the entire shutdown + connect_async +
+    /// install sequence so concurrent `connect()` calls are serialized.
+    /// Without this, two callers could each see an empty slot, each spawn
+    /// a dispatcher, and the loser's dispatcher task would leak. While a
+    /// connect is in flight, other client operations that touch the slot
+    /// (`send_request`, `disconnect`, `is_connected`) wait on the same
+    /// mutex — the desired semantics.
     pub async fn connect(&self) -> Result<(), WebSocketError> {
-        // Shut down any prior dispatcher before replacing it. Take the
-        // Arc out under the lock, then release the lock before awaiting
-        // shutdown.
-        let previous = {
-            let mut guard = self.dispatcher.lock().await;
-            guard.take()
-        };
-        if let Some(prev) = previous {
+        let mut guard = self.dispatcher.lock().await;
+        if let Some(prev) = guard.take() {
             let _ = prev.shutdown().await;
         }
-
         let dispatcher = Dispatcher::connect(
             self.config.ws_url.clone(),
             self.config.request_timeout,
@@ -107,7 +108,7 @@ impl DeribitWebSocketClient {
             self.config.dispatcher_command_capacity,
         )
         .await?;
-        *self.dispatcher.lock().await = Some(Arc::new(dispatcher));
+        *guard = Some(Arc::new(dispatcher));
         Ok(())
     }
 

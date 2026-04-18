@@ -46,6 +46,13 @@ enum DispatcherCommand {
         /// Channel used to deliver the response (or an error) to the caller.
         responder: oneshot::Sender<Result<JsonRpcResponse, WebSocketError>>,
     },
+    /// Cancel a pending waiter by id. Sent from `send_request` after a
+    /// timeout so the dispatcher does not hold a dangling sender for a
+    /// caller that already gave up.
+    CancelRequest {
+        /// JSON-RPC request id whose waiter should be evicted.
+        id: u64,
+    },
     /// Stop the dispatcher loop. In-flight waiters are drained with
     /// [`WebSocketError::ConnectionClosed`].
     Shutdown,
@@ -111,16 +118,23 @@ impl Dispatcher {
     /// The request is enqueued on the dispatcher command channel; the
     /// dispatcher writes it to the sink and records a waiter keyed by the
     /// numeric `id`. When a frame with the same id arrives, the parsed
-    /// response is delivered back through this call.
+    /// response is delivered back through this call. The configured
+    /// `request_timeout` covers the entire flow — enqueue, write, and the
+    /// wait for the response — not just the wait phase.
+    ///
+    /// On timeout the call sends a `CancelRequest` command so the
+    /// dispatcher evicts the now-orphaned waiter; this prevents unbounded
+    /// growth of the waiter map under repeated timeouts.
     ///
     /// # Errors
     ///
     /// - [`WebSocketError::DispatcherDead`] if the dispatcher task has
     ///   stopped or its responder is dropped before it can reply.
-    /// - [`WebSocketError::Timeout`] if no matching response arrives
-    ///   within the configured `request_timeout`.
+    /// - [`WebSocketError::Timeout`] if the deadline elapses before a
+    ///   response arrives. Includes time spent on the command channel.
     /// - [`WebSocketError::InvalidMessage`] if the request `id` is not a
-    ///   `u64` or if the response payload cannot be parsed.
+    ///   `u64`, the request `id` is already in flight, or the response
+    ///   payload cannot be parsed.
     /// - [`WebSocketError::ConnectionFailed`] if the sink reports an
     ///   error while writing.
     /// - [`WebSocketError::ConnectionClosed`] if the stream closed while
@@ -129,18 +143,31 @@ impl Dispatcher {
         &self,
         request: JsonRpcRequest,
     ) -> Result<JsonRpcResponse, WebSocketError> {
+        let id = request.id.as_u64();
         let (responder, waiter) = oneshot::channel();
-        self.cmd_tx
-            .send(DispatcherCommand::SendRequest { request, responder })
-            .await
-            .map_err(|_| WebSocketError::DispatcherDead)?;
-        match tokio::time::timeout(self.request_timeout, waiter).await {
-            Ok(Ok(result)) => result,
-            Ok(Err(_recv_err)) => Err(WebSocketError::DispatcherDead),
-            Err(_elapsed) => Err(WebSocketError::Timeout(format!(
-                "request_timeout {:?} elapsed",
-                self.request_timeout
-            ))),
+        let cmd = DispatcherCommand::SendRequest { request, responder };
+        let outcome = tokio::time::timeout(self.request_timeout, async {
+            self.cmd_tx
+                .send(cmd)
+                .await
+                .map_err(|_| WebSocketError::DispatcherDead)?;
+            waiter.await.map_err(|_| WebSocketError::DispatcherDead)?
+        })
+        .await;
+        match outcome {
+            Ok(result) => result,
+            Err(_elapsed) => {
+                if let Some(id) = id {
+                    let _ = self
+                        .cmd_tx
+                        .send(DispatcherCommand::CancelRequest { id })
+                        .await;
+                }
+                Err(WebSocketError::Timeout(format!(
+                    "request_timeout {:?} elapsed",
+                    self.request_timeout
+                )))
+            }
         }
     }
 
@@ -202,6 +229,15 @@ async fn run_dispatcher(
                                 continue;
                             }
                         };
+                        // Reject duplicate in-flight ids — silent overwrite
+                        // would orphan the existing waiter and could
+                        // mis-route the original response.
+                        if waiters.contains_key(&id) {
+                            let _ = responder.send(Err(WebSocketError::InvalidMessage(
+                                format!("duplicate in-flight request id {}", id),
+                            )));
+                            continue;
+                        }
                         let payload = match serde_json::to_string(&request) {
                             Ok(s) => s,
                             Err(e) => {
@@ -223,6 +259,12 @@ async fn run_dispatcher(
                             tracing::warn!(error = %e, "sink send failed; dispatcher exiting");
                             break;
                         }
+                    }
+                    Some(DispatcherCommand::CancelRequest { id }) => {
+                        // Drop the orphaned waiter. If a response races in
+                        // before this command, the response path already
+                        // removed it and this is a no-op.
+                        let _ = waiters.remove(&id);
                     }
                     Some(DispatcherCommand::Shutdown) | None => {
                         tracing::debug!("dispatcher shutdown requested");
@@ -632,6 +674,134 @@ mod tests {
             matches!(result, Err(WebSocketError::ConnectionClosed)),
             "expected ConnectionClosed after server close, got {:?}",
             result
+        );
+        dispatcher.shutdown().await.expect("dispatcher shuts down");
+        drop(dispatcher);
+        server.await.expect("server task did not panic");
+    }
+
+    #[tokio::test]
+    async fn test_dispatch_timeout_evicts_waiter_and_late_response_routed_to_notifications() {
+        // After a request times out, the dispatcher must evict the waiter
+        // so the map does not grow without bound. A late-arriving response
+        // for the timed-out id then has no waiter and should land on the
+        // notification channel like any other unmatched frame.
+        let (addr, server) = spawn_mock_server(|mut sink, mut stream| async move {
+            let req = match stream.next().await {
+                Some(Ok(Message::Text(t))) => t.to_string(),
+                _ => return,
+            };
+            let v: serde_json::Value = match serde_json::from_str(&req) {
+                Ok(v) => v,
+                Err(_) => return,
+            };
+            let id = match v.get("id").and_then(|i| i.as_u64()) {
+                Some(id) => id,
+                None => return,
+            };
+            // Wait long enough for the client to time out and cancel.
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            let resp = serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": { "late": true }
+            });
+            let _ = sink.send(Message::Text(resp.to_string().into())).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        })
+        .await;
+
+        let dispatcher = Dispatcher::connect(ws_url(addr), Duration::from_millis(100), 16, 16)
+            .await
+            .expect("dispatcher connects");
+        let result = dispatcher
+            .send_request(make_request(7, "public/test"))
+            .await;
+        assert!(
+            matches!(result, Err(WebSocketError::Timeout(_))),
+            "expected Timeout, got {:?}",
+            result
+        );
+
+        // Late response for id=7 should now arrive on the notification
+        // channel, proving the waiter was evicted (otherwise it would have
+        // been routed to the dropped oneshot and silently lost).
+        let text = tokio::time::timeout(Duration::from_secs(2), dispatcher.next_notification())
+            .await
+            .expect("late response forwarded within timeout")
+            .expect("notification channel still open");
+        let v: serde_json::Value = serde_json::from_str(&text).expect("parses as JSON");
+        assert_eq!(v.get("id").and_then(|i| i.as_u64()), Some(7));
+        dispatcher.shutdown().await.expect("dispatcher shuts down");
+        drop(dispatcher);
+        server.await.expect("server task did not panic");
+    }
+
+    #[tokio::test]
+    async fn test_dispatch_duplicate_in_flight_id_rejected() {
+        // Two requests with the same id must not silently overwrite each
+        // other. The second one is rejected with InvalidMessage; the first
+        // continues to wait for its response. The server intentionally
+        // delays its reply so the first waiter is still in the map when
+        // the duplicate fires.
+        let (addr, server) = spawn_mock_server(|mut sink, mut stream| async move {
+            let req = match stream.next().await {
+                Some(Ok(Message::Text(t))) => t.to_string(),
+                _ => return,
+            };
+            // Hold the reply long enough for the test to fire the
+            // duplicate while the first waiter is still registered.
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            let v: serde_json::Value = match serde_json::from_str(&req) {
+                Ok(v) => v,
+                Err(_) => return,
+            };
+            if let Some(id) = v.get("id").and_then(|i| i.as_u64()) {
+                let resp = serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": { "ok": true }
+                });
+                let _ = sink.send(Message::Text(resp.to_string().into())).await;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        })
+        .await;
+
+        let dispatcher = Arc::new(
+            Dispatcher::connect(ws_url(addr), Duration::from_secs(5), 16, 16)
+                .await
+                .expect("dispatcher connects"),
+        );
+
+        // Spawn the first request; it parks until the server replies.
+        let first = {
+            let d = Arc::clone(&dispatcher);
+            tokio::spawn(async move { d.send_request(make_request(42, "public/test")).await })
+        };
+
+        // Briefly yield so the dispatcher registers the waiter for id=42.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // Second request with the same id must be rejected immediately.
+        let dup = dispatcher
+            .send_request(make_request(42, "public/test"))
+            .await;
+        assert!(
+            matches!(dup, Err(WebSocketError::InvalidMessage(ref m)) if m.contains("duplicate")),
+            "duplicate id must be rejected with InvalidMessage, got {:?}",
+            dup
+        );
+
+        // The original request still completes successfully.
+        let response = first
+            .await
+            .expect("first task did not panic")
+            .expect("first request completes despite duplicate rejection");
+        assert_eq!(
+            response.id,
+            serde_json::Value::Number(42u64.into()),
+            "first request must still get its response"
         );
         dispatcher.shutdown().await.expect("dispatcher shuts down");
         drop(dispatcher);
