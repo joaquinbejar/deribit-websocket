@@ -176,7 +176,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_receive_skips_ping_frames_then_returns_text() {
-        let (addr, _server) = spawn_mock_server(|mut sink| async move {
+        let (addr, server) = spawn_mock_server(|mut sink| async move {
             for _ in 0..10_000 {
                 if sink.send(Message::Ping(Vec::new().into())).await.is_err() {
                     return;
@@ -189,11 +189,13 @@ mod tests {
         let mut client = connect_client(addr).await;
         let received = client.receive().await.expect("receive returns the text");
         assert_eq!(received, "payload");
+        drop(client);
+        server.await.expect("server task did not panic");
     }
 
     #[tokio::test]
     async fn test_receive_skips_binary_frames_then_returns_text() {
-        let (addr, _server) = spawn_mock_server(|mut sink| async move {
+        let (addr, server) = spawn_mock_server(|mut sink| async move {
             for _ in 0..100 {
                 if sink
                     .send(Message::Binary(vec![1, 2, 3].into()))
@@ -210,11 +212,13 @@ mod tests {
         let mut client = connect_client(addr).await;
         let received = client.receive().await.expect("receive returns the text");
         assert_eq!(received, "payload");
+        drop(client);
+        server.await.expect("server task did not panic");
     }
 
     #[tokio::test]
     async fn test_receive_skips_pong_frames_then_returns_text() {
-        let (addr, _server) = spawn_mock_server(|mut sink| async move {
+        let (addr, server) = spawn_mock_server(|mut sink| async move {
             for _ in 0..100 {
                 if sink.send(Message::Pong(Vec::new().into())).await.is_err() {
                     return;
@@ -227,11 +231,13 @@ mod tests {
         let mut client = connect_client(addr).await;
         let received = client.receive().await.expect("receive returns the text");
         assert_eq!(received, "payload");
+        drop(client);
+        server.await.expect("server task did not panic");
     }
 
     #[tokio::test]
     async fn test_receive_returns_closed_on_close_frame() {
-        let (addr, _server) = spawn_mock_server(|mut sink| async move {
+        let (addr, server) = spawn_mock_server(|mut sink| async move {
             let _ = sink.send(Message::Close(None)).await;
             let _ = sink.close().await;
         })
@@ -248,11 +254,13 @@ mod tests {
             !client.is_connected(),
             "stream should be cleared after close frame"
         );
+        drop(client);
+        server.await.expect("server task did not panic");
     }
 
     #[tokio::test]
     async fn test_receive_skips_mixed_non_text_frames() {
-        let (addr, _server) = spawn_mock_server(|mut sink| async move {
+        let (addr, server) = spawn_mock_server(|mut sink| async move {
             for _ in 0..200 {
                 if sink.send(Message::Ping(Vec::new().into())).await.is_err() {
                     return;
@@ -275,5 +283,7 @@ mod tests {
         let mut client = connect_client(addr).await;
         let received = client.receive().await.expect("receive returns the text");
         assert_eq!(received, "payload");
+        drop(client);
+        server.await.expect("server task did not panic");
     }
 }
