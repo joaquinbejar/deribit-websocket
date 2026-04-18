@@ -327,6 +327,7 @@ async fn run_dispatcher(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use futures_util::{SinkExt, StreamExt};

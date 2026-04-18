@@ -37,6 +37,12 @@ fmt-check:
 lint:
 	cargo clippy --all-targets --all-features -- -D warnings
 
+# Strict lints for the library + test targets only. Examples and benches are
+# intentionally excluded so illustrative code can still use `.unwrap()`.
+.PHONY: lint-strict
+lint-strict:
+	cargo clippy --lib --tests --all-features -- -D warnings -D clippy::unwrap_used -D clippy::expect_used
+
 .PHONY: lint-fix
 lint-fix: 
 	cargo clippy --fix --all-targets --all-features --allow-dirty --allow-staged -- -D warnings
@@ -48,7 +54,7 @@ clean:
 
 # Pre-push checks
 .PHONY: check
-check: test fmt-check lint
+check: test fmt-check lint lint-strict
 
 # Run the project
 .PHONY: run

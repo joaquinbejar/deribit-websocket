@@ -43,6 +43,9 @@ fn test_websocket_error_source() {
 
 #[test]
 fn test_websocket_error_variants() {
+    // Build an invalid JSON payload to get a real `serde_json::Error`.
+    let serde_err = serde_json::from_str::<serde_json::Value>("{ not json }").unwrap_err();
+
     // Test all error variants exist and can be created
     let errors = [
         WebSocketError::ConnectionFailed("test".to_string()),
@@ -51,9 +54,35 @@ fn test_websocket_error_variants() {
         WebSocketError::SubscriptionFailed("test".to_string()),
         WebSocketError::ConnectionClosed,
         WebSocketError::HeartbeatTimeout,
+        WebSocketError::Serialization(serde_err),
     ];
 
-    assert_eq!(errors.len(), 6);
+    assert_eq!(errors.len(), 7);
+}
+
+#[test]
+fn test_websocket_error_serialization_from_serde_json_error() {
+    // `?` propagation from `serde_json::to_value(...)` relies on this `From`
+    // impl being wired up by `#[from]`.
+    let serde_err = serde_json::from_str::<serde_json::Value>("{").unwrap_err();
+    let err: WebSocketError = serde_err.into();
+
+    assert!(matches!(err, WebSocketError::Serialization(_)));
+    assert!(err.to_string().starts_with("Serialization error:"));
+    assert!(err.source().is_some());
+}
+
+#[test]
+fn test_websocket_error_serialization_display_includes_inner_message() {
+    let serde_err = serde_json::from_str::<serde_json::Value>("{").unwrap_err();
+    let inner_message = serde_err.to_string();
+    let err: WebSocketError = serde_err.into();
+
+    let rendered = err.to_string();
+    assert!(
+        rendered.contains(&inner_message),
+        "outer display should embed the inner serde_json error; got {rendered:?}"
+    );
 }
 
 #[test]

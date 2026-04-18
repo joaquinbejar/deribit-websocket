@@ -39,4 +39,12 @@ pub enum WebSocketError {
     /// The background dispatcher task is not running (never started, shut
     /// down, or panicked). No further I/O can be performed through it.
     DispatcherDead,
+
+    #[error("Serialization error: {0}")]
+    /// JSON serialization or deserialization failed.
+    ///
+    /// Typically raised when a request contains a numeric field whose value
+    /// cannot be represented in JSON (e.g. `NaN` or `Infinity` in an `f64`),
+    /// or when parsing a malformed response payload.
+    Serialization(#[from] serde_json::Error),
 }

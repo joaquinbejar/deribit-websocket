@@ -261,7 +261,9 @@ fn test_close_order_with_optional_fields() {
 #[test]
 fn test_request_builder_close_position_market() {
     let mut builder = RequestBuilder::new();
-    let request = builder.build_close_position_request("BTC-PERPETUAL", "market", None);
+    let request = builder
+        .build_close_position_request("BTC-PERPETUAL", "market", None)
+        .expect("build request");
 
     assert_eq!(request.method, "private/close_position");
     assert!(request.params.is_some());
@@ -275,7 +277,9 @@ fn test_request_builder_close_position_market() {
 #[test]
 fn test_request_builder_close_position_limit() {
     let mut builder = RequestBuilder::new();
-    let request = builder.build_close_position_request("ETH-PERPETUAL", "limit", Some(3000.0));
+    let request = builder
+        .build_close_position_request("ETH-PERPETUAL", "limit", Some(3000.0))
+        .expect("build request");
 
     assert_eq!(request.method, "private/close_position");
     assert!(request.params.is_some());
@@ -293,7 +297,9 @@ fn test_request_builder_move_positions() {
         MovePositionTrade::new("BTC-PERPETUAL", 100.0).with_price(50000.0),
         MovePositionTrade::new("ETH-PERPETUAL", 50.0),
     ];
-    let request = builder.build_move_positions_request("BTC", 3, 23, &trades);
+    let request = builder
+        .build_move_positions_request("BTC", 3, 23, &trades)
+        .expect("build request");
 
     assert_eq!(request.method, "private/move_positions");
     assert!(request.params.is_some());
@@ -311,7 +317,9 @@ fn test_request_builder_move_positions() {
 fn test_request_builder_move_positions_single() {
     let mut builder = RequestBuilder::new();
     let trades = vec![MovePositionTrade::new("BTC-PERPETUAL", 110.0).with_price(35800.0)];
-    let request = builder.build_move_positions_request("BTC", 5, 10, &trades);
+    let request = builder
+        .build_move_positions_request("BTC", 5, 10, &trades)
+        .expect("build request");
 
     assert_eq!(request.method, "private/move_positions");
     let params = request.params.expect("params");
@@ -323,8 +331,12 @@ fn test_request_builder_move_positions_single() {
 fn test_request_builder_incremental_ids() {
     let mut builder = RequestBuilder::new();
 
-    let r1 = builder.build_close_position_request("BTC-PERPETUAL", "market", None);
-    let r2 = builder.build_close_position_request("ETH-PERPETUAL", "limit", Some(3000.0));
+    let r1 = builder
+        .build_close_position_request("BTC-PERPETUAL", "market", None)
+        .expect("build request 1");
+    let r2 = builder
+        .build_close_position_request("ETH-PERPETUAL", "limit", Some(3000.0))
+        .expect("build request 2");
 
     assert_eq!(r1.id, serde_json::json!(1));
     assert_eq!(r2.id, serde_json::json!(2));
