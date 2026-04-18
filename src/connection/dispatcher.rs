@@ -834,4 +834,91 @@ mod tests {
         drop(dispatcher);
         server.await.expect("server task did not panic");
     }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_dispatch_concurrent_requests_run_in_parallel() {
+        // Acceptance criterion for issue #44 — N concurrent requests must
+        // complete in roughly one server-side hold time, not N times it.
+        // The server reads N requests, holds for HOLD, then replies all
+        // at once. If the dispatcher serialized requests, total wall time
+        // would be approximately N * HOLD; in parallel it is roughly HOLD
+        // plus scheduling overhead.
+        const N: usize = 20;
+        const HOLD: Duration = Duration::from_millis(200);
+
+        let (addr, server) = spawn_mock_server(|mut sink, mut stream| async move {
+            let mut ids: Vec<u64> = Vec::with_capacity(N);
+            // Read all requests first so the test cannot mistake ordered
+            // request/response RTTs for parallelism.
+            while ids.len() < N {
+                match stream.next().await {
+                    Some(Ok(Message::Text(t))) => {
+                        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&t)
+                            && let Some(id) = v.get("id").and_then(|i| i.as_u64())
+                        {
+                            ids.push(id);
+                        }
+                    }
+                    _ => return,
+                }
+            }
+            tokio::time::sleep(HOLD).await;
+            for id in ids {
+                let resp = serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": { "echo": id }
+                });
+                if sink
+                    .send(Message::Text(resp.to_string().into()))
+                    .await
+                    .is_err()
+                {
+                    return;
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        })
+        .await;
+
+        let dispatcher = Arc::new(
+            Dispatcher::connect(ws_url(addr), Duration::from_secs(5), 64, 64)
+                .await
+                .expect("dispatcher connects"),
+        );
+
+        let start = std::time::Instant::now();
+        let mut handles = Vec::with_capacity(N);
+        for i in 0..N {
+            let d = Arc::clone(&dispatcher);
+            let id = 1000u64 + i as u64;
+            handles.push(tokio::spawn(async move {
+                d.send_request(make_request(id, "public/test")).await
+            }));
+        }
+        for handle in handles {
+            handle
+                .await
+                .expect("task did not panic")
+                .expect("response arrives");
+        }
+        let elapsed = start.elapsed();
+
+        // Serial would be N * HOLD = 4000ms. Parallel is roughly HOLD plus
+        // scheduling overhead. Use a generous bound (3 * HOLD = 600ms)
+        // so the test is not flaky on slow CI hosts.
+        let serial_lower_bound = HOLD * (N as u32);
+        let parallel_upper_bound = HOLD * 3;
+        assert!(
+            elapsed < parallel_upper_bound,
+            "concurrent requests took {:?}; serial would be {:?}, parallel bound is {:?}",
+            elapsed,
+            serial_lower_bound,
+            parallel_upper_bound
+        );
+
+        dispatcher.shutdown().await.expect("dispatcher shuts down");
+        drop(dispatcher);
+        server.await.expect("server task did not panic");
+    }
 }

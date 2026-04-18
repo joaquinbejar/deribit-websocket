@@ -185,6 +185,9 @@
 
 #![warn(missing_docs)]
 #![deny(unsafe_code)]
+// Regression guard against future `std::sync::Mutex` use across `.await`.
+// Tokio's mutex (which this crate uses) is intentionally allowed.
+#![warn(clippy::await_holding_lock)]
 
 pub mod callback;
 pub mod client;

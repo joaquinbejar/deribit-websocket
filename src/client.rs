@@ -183,12 +183,17 @@ impl DeribitWebSocketClient {
             builder.build_subscribe_request(channels.clone())
         };
 
-        // Update subscription manager
-        let mut sub_manager = self.subscription_manager.lock().await;
-        for channel in channels {
-            let channel_type = self.parse_channel_type(&channel);
-            let instrument = self.extract_instrument(&channel);
-            sub_manager.add_subscription(channel, channel_type, instrument);
+        // Update subscription manager. The lock is scoped to this block so
+        // it is released before the network round-trip below; otherwise
+        // concurrent subscribe/unsubscribe calls would serialize on the
+        // shared subscription_manager mutex.
+        {
+            let mut sub_manager = self.subscription_manager.lock().await;
+            for channel in channels {
+                let channel_type = self.parse_channel_type(&channel);
+                let instrument = self.extract_instrument(&channel);
+                sub_manager.add_subscription(channel, channel_type, instrument);
+            }
         }
 
         self.send_request(request).await
@@ -204,10 +209,14 @@ impl DeribitWebSocketClient {
             builder.build_unsubscribe_request(channels.clone())
         };
 
-        // Update subscription manager
-        let mut sub_manager = self.subscription_manager.lock().await;
-        for channel in channels {
-            sub_manager.remove_subscription(&channel);
+        // Update subscription manager. Lock scoped to this block so it is
+        // released before the network round-trip below — keeps concurrent
+        // unsubscribe calls from serializing on the shared mutex.
+        {
+            let mut sub_manager = self.subscription_manager.lock().await;
+            for channel in channels {
+                sub_manager.remove_subscription(&channel);
+            }
         }
 
         self.send_request(request).await
@@ -233,9 +242,11 @@ impl DeribitWebSocketClient {
 
         let response = self.send_request(request).await?;
 
-        // Clear subscription manager
-        let mut sub_manager = self.subscription_manager.lock().await;
-        sub_manager.clear();
+        // Clear subscription manager. Lock scoped to the mutation so
+        // concurrent callers do not serialize on it.
+        {
+            self.subscription_manager.lock().await.clear();
+        }
 
         match response.result {
             JsonRpcResult::Success { result } => {
@@ -271,9 +282,11 @@ impl DeribitWebSocketClient {
 
         let response = self.send_request(request).await?;
 
-        // Clear subscription manager
-        let mut sub_manager = self.subscription_manager.lock().await;
-        sub_manager.clear();
+        // Clear subscription manager. Lock scoped to the mutation so
+        // concurrent callers do not serialize on it.
+        {
+            self.subscription_manager.lock().await.clear();
+        }
 
         match response.result {
             JsonRpcResult::Success { result } => {
