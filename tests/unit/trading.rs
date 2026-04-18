@@ -355,7 +355,9 @@ fn test_trade_execution_deserialization() {
 fn test_request_builder_buy() {
     let mut builder = RequestBuilder::new();
     let order_request = OrderRequest::limit("BTC-PERPETUAL".to_string(), 100.0, 50000.0);
-    let request = builder.build_buy_request(&order_request);
+    let request = builder
+        .build_buy_request(&order_request)
+        .expect("build request");
 
     assert_eq!(request.method, "private/buy");
     assert!(request.params.is_some());
@@ -369,7 +371,9 @@ fn test_request_builder_buy() {
 fn test_request_builder_sell() {
     let mut builder = RequestBuilder::new();
     let order_request = OrderRequest::limit("ETH-PERPETUAL".to_string(), 10.0, 3000.0);
-    let request = builder.build_sell_request(&order_request);
+    let request = builder
+        .build_sell_request(&order_request)
+        .expect("build request");
 
     assert_eq!(request.method, "private/sell");
     assert!(request.params.is_some());
@@ -427,7 +431,9 @@ fn test_request_builder_cancel_all_by_instrument() {
 fn test_request_builder_edit() {
     let mut builder = RequestBuilder::new();
     let edit_request = EditOrderRequest::new("order123".to_string(), 200.0).with_price(51000.0);
-    let request = builder.build_edit_request(&edit_request);
+    let request = builder
+        .build_edit_request(&edit_request)
+        .expect("build request");
 
     assert_eq!(request.method, "private/edit");
     assert!(request.params.is_some());

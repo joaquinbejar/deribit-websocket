@@ -510,3 +510,200 @@ fn test_test_response_equality() {
     assert_eq!(response1, response2);
     assert_ne!(response1, response3);
 }
+
+// =============================================================================
+// Serialization error propagation tests (Issue #46)
+//
+// Every request builder that accepts untrusted `f64` input must surface a
+// `WebSocketError::Serialization` instead of panicking when the input cannot
+// be encoded as JSON (NaN / Infinity). These tests lock in that contract.
+// =============================================================================
+
+use deribit_websocket::error::WebSocketError;
+use deribit_websocket::model::{
+    CancelQuotesRequest, EditOrderRequest, MassQuoteRequest, MmpGroupConfig, MovePositionTrade,
+    OrderRequest, Quote,
+};
+
+#[test]
+fn test_build_mass_quote_request_nan_price_returns_serialization_error() {
+    let mut builder = RequestBuilder::new();
+    let quotes = vec![Quote::buy("BTC-PERPETUAL".to_string(), 1.0, f64::NAN)];
+    let request = MassQuoteRequest::new("btc_group".to_string(), quotes);
+
+    let result = builder.build_mass_quote_request(request);
+
+    assert!(
+        matches!(result, Err(WebSocketError::Serialization(_))),
+        "NaN price must propagate as Serialization error, got {result:?}"
+    );
+}
+
+#[test]
+fn test_build_mass_quote_request_infinity_amount_returns_serialization_error() {
+    let mut builder = RequestBuilder::new();
+    let quotes = vec![Quote::buy(
+        "BTC-PERPETUAL".to_string(),
+        f64::INFINITY,
+        50_000.0,
+    )];
+    let request = MassQuoteRequest::new("btc_group".to_string(), quotes);
+
+    let result = builder.build_mass_quote_request(request);
+
+    assert!(
+        matches!(result, Err(WebSocketError::Serialization(_))),
+        "Infinity amount must propagate as Serialization error, got {result:?}"
+    );
+}
+
+#[test]
+fn test_build_mass_quote_request_happy_path_returns_ok() {
+    let mut builder = RequestBuilder::new();
+    let quotes = vec![
+        Quote::buy("BTC-PERPETUAL".to_string(), 1.0, 50_000.0),
+        Quote::sell("BTC-PERPETUAL".to_string(), 1.0, 51_000.0),
+    ];
+    let request = MassQuoteRequest::new("btc_group".to_string(), quotes);
+
+    let rpc = builder
+        .build_mass_quote_request(request)
+        .expect("valid request should build successfully");
+
+    assert_eq!(rpc.method, "private/mass_quote");
+    assert_eq!(rpc.jsonrpc, "2.0");
+    assert!(rpc.params.is_some());
+}
+
+#[test]
+fn test_build_cancel_quotes_request_nan_delta_returns_serialization_error() {
+    let mut builder = RequestBuilder::new();
+    let request = CancelQuotesRequest::by_delta_range(f64::NAN, 1.0);
+
+    let result = builder.build_cancel_quotes_request(request);
+
+    assert!(
+        matches!(result, Err(WebSocketError::Serialization(_))),
+        "NaN delta must propagate as Serialization error, got {result:?}"
+    );
+}
+
+#[test]
+fn test_build_buy_request_nan_price_returns_serialization_error() {
+    let mut builder = RequestBuilder::new();
+    let request = OrderRequest::limit("BTC-PERPETUAL".to_string(), 1.0, f64::NAN);
+
+    let result = builder.build_buy_request(&request);
+
+    assert!(
+        matches!(result, Err(WebSocketError::Serialization(_))),
+        "NaN price must propagate as Serialization error, got {result:?}"
+    );
+}
+
+#[test]
+fn test_build_sell_request_infinity_max_show_returns_serialization_error() {
+    let mut builder = RequestBuilder::new();
+    let request = OrderRequest::limit("BTC-PERPETUAL".to_string(), 1.0, 50_000.0)
+        .with_max_show(f64::INFINITY);
+
+    let result = builder.build_sell_request(&request);
+
+    assert!(
+        matches!(result, Err(WebSocketError::Serialization(_))),
+        "Infinity max_show must propagate as Serialization error, got {result:?}"
+    );
+}
+
+#[test]
+fn test_build_edit_request_nan_trigger_price_returns_serialization_error() {
+    let mut builder = RequestBuilder::new();
+    // `EditOrderRequest` only exposes a `with_price` builder, so construct via
+    // struct literal to place the NaN on the intended field.
+    let request = EditOrderRequest {
+        order_id: "order-1".to_string(),
+        amount: 1.0,
+        price: Some(50_000.0),
+        post_only: None,
+        reduce_only: None,
+        advanced: None,
+        trigger_price: Some(f64::NAN),
+        mmp: None,
+        valid_until: None,
+    };
+
+    let result = builder.build_edit_request(&request);
+
+    assert!(
+        matches!(result, Err(WebSocketError::Serialization(_))),
+        "NaN trigger_price must propagate as Serialization error, got {result:?}"
+    );
+}
+
+#[test]
+fn test_build_close_position_request_nan_price_returns_serialization_error() {
+    let mut builder = RequestBuilder::new();
+
+    let result = builder.build_close_position_request("BTC-PERPETUAL", "limit", Some(f64::NAN));
+
+    assert!(
+        matches!(result, Err(WebSocketError::Serialization(_))),
+        "NaN close_position price must propagate as Serialization error, got {result:?}"
+    );
+}
+
+#[test]
+fn test_build_move_positions_request_nan_amount_returns_serialization_error() {
+    let mut builder = RequestBuilder::new();
+    let trades = vec![MovePositionTrade::new("BTC-PERPETUAL", f64::NAN)];
+
+    let result = builder.build_move_positions_request("BTC", 1, 2, &trades);
+
+    assert!(
+        matches!(result, Err(WebSocketError::Serialization(_))),
+        "NaN move_positions amount must propagate as Serialization error, got {result:?}"
+    );
+}
+
+#[test]
+fn test_build_set_mmp_config_request_nan_quantity_limit_returns_serialization_error() {
+    // `MmpGroupConfig::new` compares magnitudes with `>=` and `>`, both of
+    // which return false for NaN. That lets NaN slip past validation and into
+    // the wire format as a silent `null`. The builder must catch it.
+    let mut builder = RequestBuilder::new();
+    let config = MmpGroupConfig {
+        mmp_group: "btc_mm".to_string(),
+        quantity_limit: f64::NAN,
+        delta_limit: 1.0,
+        interval: 1_000,
+        frozen_time: 5_000,
+        enabled: true,
+    };
+
+    let result = builder.build_set_mmp_config_request(config);
+
+    assert!(
+        matches!(result, Err(WebSocketError::Serialization(_))),
+        "NaN quantity_limit must propagate as Serialization error, got {result:?}"
+    );
+}
+
+#[test]
+fn test_build_set_mmp_config_request_infinity_delta_limit_returns_serialization_error() {
+    let mut builder = RequestBuilder::new();
+    let config = MmpGroupConfig {
+        mmp_group: "btc_mm".to_string(),
+        quantity_limit: 10.0,
+        delta_limit: f64::INFINITY,
+        interval: 1_000,
+        frozen_time: 5_000,
+        enabled: true,
+    };
+
+    let result = builder.build_set_mmp_config_request(config);
+
+    assert!(
+        matches!(result, Err(WebSocketError::Serialization(_))),
+        "Infinity delta_limit must propagate as Serialization error, got {result:?}"
+    );
+}

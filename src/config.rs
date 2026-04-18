@@ -115,6 +115,9 @@ impl Default for WebSocketConfig {
             .unwrap_or(64);
 
         Self {
+            // TODO(#48): Replace Default with a fallible constructor so this
+            // hard-coded fallback URL does not rely on an `.unwrap()`.
+            #[allow(clippy::unwrap_used)]
             ws_url: Url::parse(&ws_url)
                 .unwrap_or_else(|_| Url::parse("wss://www.deribit.com/ws/api/v2").unwrap()),
             heartbeat_interval,

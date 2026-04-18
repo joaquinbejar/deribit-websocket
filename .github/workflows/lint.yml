@@ -32,3 +32,6 @@ jobs:
 
       - name: Lint
         run: make lint
+
+      - name: Lint (strict — ban unwrap/expect in lib and tests)
+        run: make lint-strict

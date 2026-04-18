@@ -1,6 +1,40 @@
 //! WebSocket request message handling
 
+use serde::ser::Error as _;
+
+use crate::error::WebSocketError;
 use crate::model::{quote::*, trading::*, ws_types::JsonRpcRequest};
+
+/// Build a [`WebSocketError::Serialization`] carrying `msg` as the underlying
+/// `serde_json::Error`. Used to surface non-finite-float rejections the same
+/// way a real JSON serialization failure would surface.
+#[cold]
+#[inline(never)]
+fn serialization_error(msg: impl std::fmt::Display) -> WebSocketError {
+    WebSocketError::Serialization(serde_json::Error::custom(msg))
+}
+
+/// Reject `NaN` and `+/- Infinity`. `serde_json` silently maps these to
+/// `null` when serializing — which would otherwise corrupt outgoing requests.
+#[inline]
+fn check_finite(field: &'static str, value: f64) -> Result<(), WebSocketError> {
+    if value.is_finite() {
+        Ok(())
+    } else {
+        Err(serialization_error(format_args!(
+            "field `{field}` must be finite, got {value}"
+        )))
+    }
+}
+
+/// Same as [`check_finite`] for optional values. `None` is always accepted.
+#[inline]
+fn check_finite_opt(field: &'static str, value: Option<f64>) -> Result<(), WebSocketError> {
+    match value {
+        Some(v) => check_finite(field, v),
+        None => Ok(()),
+    }
+}
 
 /// Request builder for WebSocket messages
 #[derive(Debug, Clone)]
@@ -213,22 +247,59 @@ impl RequestBuilder {
     }
 
     /// Build mass quote request
-    pub fn build_mass_quote_request(&mut self, request: MassQuoteRequest) -> JsonRpcRequest {
-        let params = serde_json::to_value(request).expect("Failed to serialize mass quote request");
-
-        self.build_request("private/mass_quote", Some(params))
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WebSocketError::Serialization`] if the request contains values
+    /// that cannot be represented in JSON (for example `NaN` or `Infinity` in
+    /// any `f64` field such as `price` or `amount`).
+    pub fn build_mass_quote_request(
+        &mut self,
+        request: MassQuoteRequest,
+    ) -> Result<JsonRpcRequest, WebSocketError> {
+        for quote in &request.quotes {
+            check_finite("quotes[].amount", quote.amount)?;
+            check_finite("quotes[].price", quote.price)?;
+        }
+        let params = serde_json::to_value(request)?;
+        Ok(self.build_request("private/mass_quote", Some(params)))
     }
 
     /// Build cancel quotes request
-    pub fn build_cancel_quotes_request(&mut self, request: CancelQuotesRequest) -> JsonRpcRequest {
-        let params =
-            serde_json::to_value(request).expect("Failed to serialize cancel quotes request");
-
-        self.build_request("private/cancel_quotes", Some(params))
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WebSocketError::Serialization`] if the request contains values
+    /// that cannot be represented in JSON (for example `NaN` or `Infinity` in
+    /// the `delta_range` tuple).
+    pub fn build_cancel_quotes_request(
+        &mut self,
+        request: CancelQuotesRequest,
+    ) -> Result<JsonRpcRequest, WebSocketError> {
+        if let Some((min, max)) = request.delta_range {
+            check_finite("delta_range.min", min)?;
+            check_finite("delta_range.max", max)?;
+        }
+        let params = serde_json::to_value(request)?;
+        Ok(self.build_request("private/cancel_quotes", Some(params)))
     }
 
     /// Build set MMP config request
-    pub fn build_set_mmp_config_request(&mut self, config: MmpGroupConfig) -> JsonRpcRequest {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WebSocketError::Serialization`] if `config.quantity_limit` or
+    /// `config.delta_limit` is `NaN` or `Infinity`. `MmpGroupConfig::new`
+    /// enforces magnitude invariants but NaN comparisons always return false
+    /// and silently bypass them, which is why the finite check is repeated
+    /// here.
+    pub fn build_set_mmp_config_request(
+        &mut self,
+        config: MmpGroupConfig,
+    ) -> Result<JsonRpcRequest, WebSocketError> {
+        check_finite("quantity_limit", config.quantity_limit)?;
+        check_finite("delta_limit", config.delta_limit)?;
+
         let mut params = serde_json::json!({
             "mmp_group": config.mmp_group,
             "quantity_limit": config.quantity_limit,
@@ -242,7 +313,7 @@ impl RequestBuilder {
             params["interval"] = serde_json::Value::Number(serde_json::Number::from(0));
         }
 
-        self.build_request("private/set_mmp_config", Some(params))
+        Ok(self.build_request("private/set_mmp_config", Some(params)))
     }
 
     /// Build get MMP config request
@@ -294,121 +365,41 @@ impl RequestBuilder {
     }
 
     /// Build buy order request
-    pub fn build_buy_request(&mut self, request: &OrderRequest) -> JsonRpcRequest {
-        let mut params = serde_json::json!({
-            "instrument_name": request.instrument_name,
-            "amount": request.amount
-        });
-
-        if let Some(ref order_type) = request.order_type {
-            params["type"] = serde_json::Value::String(order_type.as_str().to_string());
-        }
-        if let Some(price) = request.price {
-            params["price"] = serde_json::Value::Number(
-                serde_json::Number::from_f64(price).unwrap_or(serde_json::Number::from(0)),
-            );
-        }
-        if let Some(ref label) = request.label {
-            params["label"] = serde_json::Value::String(label.clone());
-        }
-        if let Some(ref tif) = request.time_in_force {
-            params["time_in_force"] = serde_json::Value::String(tif.as_str().to_string());
-        }
-        if let Some(max_show) = request.max_show {
-            params["max_show"] = serde_json::Value::Number(
-                serde_json::Number::from_f64(max_show).unwrap_or(serde_json::Number::from(0)),
-            );
-        }
-        if let Some(post_only) = request.post_only {
-            params["post_only"] = serde_json::Value::Bool(post_only);
-        }
-        if let Some(reduce_only) = request.reduce_only {
-            params["reduce_only"] = serde_json::Value::Bool(reduce_only);
-        }
-        if let Some(trigger_price) = request.trigger_price {
-            params["trigger_price"] = serde_json::Value::Number(
-                serde_json::Number::from_f64(trigger_price).unwrap_or(serde_json::Number::from(0)),
-            );
-        }
-        if let Some(ref trigger) = request.trigger {
-            let trigger_str = match trigger {
-                Trigger::IndexPrice => "index_price",
-                Trigger::MarkPrice => "mark_price",
-                Trigger::LastPrice => "last_price",
-            };
-            params["trigger"] = serde_json::Value::String(trigger_str.to_string());
-        }
-        if let Some(ref advanced) = request.advanced {
-            params["advanced"] = serde_json::Value::String(advanced.clone());
-        }
-        if let Some(mmp) = request.mmp {
-            params["mmp"] = serde_json::Value::Bool(mmp);
-        }
-        if let Some(valid_until) = request.valid_until {
-            params["valid_until"] =
-                serde_json::Value::Number(serde_json::Number::from(valid_until));
-        }
-
-        self.build_request("private/buy", Some(params))
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WebSocketError::Serialization`] if `request` contains values
+    /// that cannot be represented in JSON (for example `NaN` or `Infinity` in
+    /// `price`, `amount`, `max_show` or `trigger_price`).
+    pub fn build_buy_request(
+        &mut self,
+        request: &OrderRequest,
+    ) -> Result<JsonRpcRequest, WebSocketError> {
+        check_finite("amount", request.amount)?;
+        check_finite_opt("price", request.price)?;
+        check_finite_opt("max_show", request.max_show)?;
+        check_finite_opt("trigger_price", request.trigger_price)?;
+        let params = serde_json::to_value(request)?;
+        Ok(self.build_request("private/buy", Some(params)))
     }
 
     /// Build sell order request
-    pub fn build_sell_request(&mut self, request: &OrderRequest) -> JsonRpcRequest {
-        let mut params = serde_json::json!({
-            "instrument_name": request.instrument_name,
-            "amount": request.amount
-        });
-
-        if let Some(ref order_type) = request.order_type {
-            params["type"] = serde_json::Value::String(order_type.as_str().to_string());
-        }
-        if let Some(price) = request.price {
-            params["price"] = serde_json::Value::Number(
-                serde_json::Number::from_f64(price).unwrap_or(serde_json::Number::from(0)),
-            );
-        }
-        if let Some(ref label) = request.label {
-            params["label"] = serde_json::Value::String(label.clone());
-        }
-        if let Some(ref tif) = request.time_in_force {
-            params["time_in_force"] = serde_json::Value::String(tif.as_str().to_string());
-        }
-        if let Some(max_show) = request.max_show {
-            params["max_show"] = serde_json::Value::Number(
-                serde_json::Number::from_f64(max_show).unwrap_or(serde_json::Number::from(0)),
-            );
-        }
-        if let Some(post_only) = request.post_only {
-            params["post_only"] = serde_json::Value::Bool(post_only);
-        }
-        if let Some(reduce_only) = request.reduce_only {
-            params["reduce_only"] = serde_json::Value::Bool(reduce_only);
-        }
-        if let Some(trigger_price) = request.trigger_price {
-            params["trigger_price"] = serde_json::Value::Number(
-                serde_json::Number::from_f64(trigger_price).unwrap_or(serde_json::Number::from(0)),
-            );
-        }
-        if let Some(ref trigger) = request.trigger {
-            let trigger_str = match trigger {
-                Trigger::IndexPrice => "index_price",
-                Trigger::MarkPrice => "mark_price",
-                Trigger::LastPrice => "last_price",
-            };
-            params["trigger"] = serde_json::Value::String(trigger_str.to_string());
-        }
-        if let Some(ref advanced) = request.advanced {
-            params["advanced"] = serde_json::Value::String(advanced.clone());
-        }
-        if let Some(mmp) = request.mmp {
-            params["mmp"] = serde_json::Value::Bool(mmp);
-        }
-        if let Some(valid_until) = request.valid_until {
-            params["valid_until"] =
-                serde_json::Value::Number(serde_json::Number::from(valid_until));
-        }
-
-        self.build_request("private/sell", Some(params))
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WebSocketError::Serialization`] if `request` contains values
+    /// that cannot be represented in JSON (for example `NaN` or `Infinity` in
+    /// `price`, `amount`, `max_show` or `trigger_price`).
+    pub fn build_sell_request(
+        &mut self,
+        request: &OrderRequest,
+    ) -> Result<JsonRpcRequest, WebSocketError> {
+        check_finite("amount", request.amount)?;
+        check_finite_opt("price", request.price)?;
+        check_finite_opt("max_show", request.max_show)?;
+        check_finite_opt("trigger_price", request.trigger_price)?;
+        let params = serde_json::to_value(request)?;
+        Ok(self.build_request("private/sell", Some(params)))
     }
 
     /// Build cancel order request
@@ -447,40 +438,21 @@ impl RequestBuilder {
     }
 
     /// Build edit order request
-    pub fn build_edit_request(&mut self, request: &EditOrderRequest) -> JsonRpcRequest {
-        let mut params = serde_json::json!({
-            "order_id": request.order_id,
-            "amount": request.amount
-        });
-
-        if let Some(price) = request.price {
-            params["price"] = serde_json::Value::Number(
-                serde_json::Number::from_f64(price).unwrap_or(serde_json::Number::from(0)),
-            );
-        }
-        if let Some(post_only) = request.post_only {
-            params["post_only"] = serde_json::Value::Bool(post_only);
-        }
-        if let Some(reduce_only) = request.reduce_only {
-            params["reduce_only"] = serde_json::Value::Bool(reduce_only);
-        }
-        if let Some(ref advanced) = request.advanced {
-            params["advanced"] = serde_json::Value::String(advanced.clone());
-        }
-        if let Some(trigger_price) = request.trigger_price {
-            params["trigger_price"] = serde_json::Value::Number(
-                serde_json::Number::from_f64(trigger_price).unwrap_or(serde_json::Number::from(0)),
-            );
-        }
-        if let Some(mmp) = request.mmp {
-            params["mmp"] = serde_json::Value::Bool(mmp);
-        }
-        if let Some(valid_until) = request.valid_until {
-            params["valid_until"] =
-                serde_json::Value::Number(serde_json::Number::from(valid_until));
-        }
-
-        self.build_request("private/edit", Some(params))
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WebSocketError::Serialization`] if `request` contains values
+    /// that cannot be represented in JSON (for example `NaN` or `Infinity` in
+    /// `price`, `amount` or `trigger_price`).
+    pub fn build_edit_request(
+        &mut self,
+        request: &EditOrderRequest,
+    ) -> Result<JsonRpcRequest, WebSocketError> {
+        check_finite("amount", request.amount)?;
+        check_finite_opt("price", request.price)?;
+        check_finite_opt("trigger_price", request.trigger_price)?;
+        let params = serde_json::to_value(request)?;
+        Ok(self.build_request("private/edit", Some(params)))
     }
 
     // Account methods
@@ -633,12 +605,17 @@ impl RequestBuilder {
     /// # Returns
     ///
     /// A JSON-RPC request for closing a position
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WebSocketError::Serialization`] if `price` is `NaN` or
+    /// `Infinity`, which cannot be represented in JSON.
     pub fn build_close_position_request(
         &mut self,
         instrument_name: &str,
         order_type: &str,
         price: Option<f64>,
-    ) -> JsonRpcRequest {
+    ) -> Result<JsonRpcRequest, WebSocketError> {
         let mut params = serde_json::Map::new();
         params.insert(
             "instrument_name".to_string(),
@@ -649,16 +626,15 @@ impl RequestBuilder {
             serde_json::Value::String(order_type.to_string()),
         );
 
-        if let Some(price) = price
-            && let Some(price_num) = serde_json::Number::from_f64(price)
-        {
-            params.insert("price".to_string(), serde_json::Value::Number(price_num));
+        if let Some(price) = price {
+            check_finite("price", price)?;
+            params.insert("price".to_string(), serde_json::to_value(price)?);
         }
 
-        self.build_request(
+        Ok(self.build_request(
             crate::constants::methods::PRIVATE_CLOSE_POSITION,
             Some(serde_json::Value::Object(params)),
-        )
+        ))
     }
 
     /// Build a move_positions request
@@ -673,32 +649,24 @@ impl RequestBuilder {
     /// # Returns
     ///
     /// A JSON-RPC request for moving positions between subaccounts
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WebSocketError::Serialization`] if any `amount` or `price`
+    /// value in `trades` is `NaN` or `Infinity`, which cannot be represented
+    /// in JSON.
     pub fn build_move_positions_request(
         &mut self,
         currency: &str,
         source_uid: u64,
         target_uid: u64,
         trades: &[crate::model::MovePositionTrade],
-    ) -> JsonRpcRequest {
-        let trades_json: Vec<serde_json::Value> = trades
-            .iter()
-            .map(|t| {
-                let mut trade_obj = serde_json::Map::new();
-                trade_obj.insert(
-                    "instrument_name".to_string(),
-                    serde_json::Value::String(t.instrument_name.clone()),
-                );
-                if let Some(amount_num) = serde_json::Number::from_f64(t.amount) {
-                    trade_obj.insert("amount".to_string(), serde_json::Value::Number(amount_num));
-                }
-                if let Some(price) = t.price
-                    && let Some(price_num) = serde_json::Number::from_f64(price)
-                {
-                    trade_obj.insert("price".to_string(), serde_json::Value::Number(price_num));
-                }
-                serde_json::Value::Object(trade_obj)
-            })
-            .collect();
+    ) -> Result<JsonRpcRequest, WebSocketError> {
+        for trade in trades {
+            check_finite("trades[_].amount", trade.amount)?;
+            check_finite_opt("trades[_].price", trade.price)?;
+        }
+        let trades_json = serde_json::to_value(trades)?;
 
         let params = serde_json::json!({
             "currency": currency,
@@ -707,9 +675,9 @@ impl RequestBuilder {
             "trades": trades_json
         });
 
-        self.build_request(
+        Ok(self.build_request(
             crate::constants::methods::PRIVATE_MOVE_POSITIONS,
             Some(params),
-        )
+        ))
     }
 }

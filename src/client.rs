@@ -646,7 +646,7 @@ impl DeribitWebSocketClient {
 
         let json_request = {
             let mut builder = self.request_builder.lock().await;
-            builder.build_mass_quote_request(request)
+            builder.build_mass_quote_request(request)?
         };
 
         let response = self.send_request(json_request).await?;
@@ -672,7 +672,7 @@ impl DeribitWebSocketClient {
     ) -> Result<CancelQuotesResponse, WebSocketError> {
         let json_request = {
             let mut builder = self.request_builder.lock().await;
-            builder.build_cancel_quotes_request(request)
+            builder.build_cancel_quotes_request(request)?
         };
 
         let response = self.send_request(json_request).await?;
@@ -695,7 +695,7 @@ impl DeribitWebSocketClient {
     pub async fn set_mmp_config(&self, config: MmpGroupConfig) -> Result<(), WebSocketError> {
         let json_request = {
             let mut builder = self.request_builder.lock().await;
-            builder.build_set_mmp_config_request(config)
+            builder.build_set_mmp_config_request(config)?
         };
 
         let response = self.send_request(json_request).await?;
@@ -792,7 +792,7 @@ impl DeribitWebSocketClient {
     ) -> Result<crate::model::trading::OrderResponse, WebSocketError> {
         let json_request = {
             let mut builder = self.request_builder.lock().await;
-            builder.build_buy_request(&request)
+            builder.build_buy_request(&request)?
         };
 
         let response = self.send_request(json_request).await?;
@@ -822,7 +822,7 @@ impl DeribitWebSocketClient {
     ) -> Result<crate::model::trading::OrderResponse, WebSocketError> {
         let json_request = {
             let mut builder = self.request_builder.lock().await;
-            builder.build_sell_request(&request)
+            builder.build_sell_request(&request)?
         };
 
         let response = self.send_request(json_request).await?;
@@ -971,7 +971,7 @@ impl DeribitWebSocketClient {
     ) -> Result<crate::model::trading::OrderResponse, WebSocketError> {
         let json_request = {
             let mut builder = self.request_builder.lock().await;
-            builder.build_edit_request(&request)
+            builder.build_edit_request(&request)?
         };
 
         let response = self.send_request(json_request).await?;
@@ -1176,7 +1176,7 @@ impl DeribitWebSocketClient {
     ) -> Result<crate::model::ClosePositionResponse, WebSocketError> {
         let json_request = {
             let mut builder = self.request_builder.lock().await;
-            builder.build_close_position_request(instrument_name, order_type, price)
+            builder.build_close_position_request(instrument_name, order_type, price)?
         };
 
         let response = self.send_request(json_request).await?;
@@ -1221,7 +1221,7 @@ impl DeribitWebSocketClient {
     ) -> Result<Vec<crate::model::MovePositionResult>, WebSocketError> {
         let json_request = {
             let mut builder = self.request_builder.lock().await;
-            builder.build_move_positions_request(currency, source_uid, target_uid, trades)
+            builder.build_move_positions_request(currency, source_uid, target_uid, trades)?
         };
 
         let response = self.send_request(json_request).await?;
@@ -1353,6 +1353,10 @@ impl DeribitWebSocketClient {
 impl Default for DeribitWebSocketClient {
     fn default() -> Self {
         let config = WebSocketConfig::default();
+        // `Default` cannot return `Result`; `Self::new` only fails on invalid
+        // URL parsing which cannot happen for `WebSocketConfig::default()`.
+        // Tracked separately for a fallible-only constructor redesign.
+        #[allow(clippy::unwrap_used)]
         Self::new(&config).unwrap()
     }
 }

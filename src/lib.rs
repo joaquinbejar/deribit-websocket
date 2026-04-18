@@ -188,6 +188,9 @@
 // Regression guard against future `std::sync::Mutex` use across `.await`.
 // Tokio's mutex (which this crate uses) is intentionally allowed.
 #![warn(clippy::await_holding_lock)]
+// Ban `.unwrap()`/`.expect()` in library code. `#[cfg(test)]` modules inside
+// `src/` keep the default behaviour so existing unit tests continue to work.
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod callback;
 pub mod client;
