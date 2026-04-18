@@ -16,11 +16,14 @@ pub struct WebSocketSession {
 
 impl WebSocketSession {
     /// Create a new WebSocket session
-    pub fn new(config: WebSocketConfig) -> Self {
+    pub fn new(
+        config: WebSocketConfig,
+        subscription_manager: Arc<Mutex<SubscriptionManager>>,
+    ) -> Self {
         Self {
             config: Arc::new(config),
             state: Arc::new(Mutex::new(ConnectionState::Disconnected)),
-            subscription_manager: Arc::new(Mutex::new(SubscriptionManager::new())),
+            subscription_manager,
         }
     }
 
@@ -65,8 +68,9 @@ impl WebSocketSession {
     /// Mark session as disconnected
     pub async fn mark_disconnected(&self) {
         self.set_state(ConnectionState::Disconnected).await;
-        // Deactivate all subscriptions
-        self.subscription_manager.lock().await.clear();
+        // Deactivate all subscriptions but preserve their entries so
+        // `reactivate_subscriptions` can restore them on reconnect.
+        self.subscription_manager.lock().await.deactivate_all();
     }
 
     /// Reactivate subscriptions after reconnection
