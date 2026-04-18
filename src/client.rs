@@ -45,7 +45,11 @@ impl DeribitWebSocketClient {
     /// Create a new WebSocket client
     pub fn new(config: &WebSocketConfig) -> Result<Self, WebSocketError> {
         let connection = Arc::new(Mutex::new(WebSocketConnection::new(config.ws_url.clone())));
-        let session = Arc::new(WebSocketSession::new(config.clone()));
+        let subscription_manager = Arc::new(Mutex::new(SubscriptionManager::new()));
+        let session = Arc::new(WebSocketSession::new(
+            config.clone(),
+            Arc::clone(&subscription_manager),
+        ));
         let (tx, rx) = mpsc::unbounded_channel();
 
         let config = Arc::new(config.clone());
@@ -56,11 +60,19 @@ impl DeribitWebSocketClient {
             request_builder: Arc::new(Mutex::new(RequestBuilder::new())),
             response_handler: Arc::new(ResponseHandler::new()),
             notification_handler: Arc::new(NotificationHandler::new()),
-            subscription_manager: Arc::new(Mutex::new(SubscriptionManager::new())),
+            subscription_manager,
             message_sender: Some(tx),
             message_receiver: Some(rx),
             message_handler: None,
         })
+    }
+
+    /// Returns a handle to the shared subscription manager. The same
+    /// handle is held by `self.session`, so all subscription state is
+    /// observable from either side.
+    #[must_use]
+    pub fn subscription_manager(&self) -> Arc<Mutex<SubscriptionManager>> {
+        Arc::clone(&self.subscription_manager)
     }
 
     /// Create a new WebSocket client with default configuration

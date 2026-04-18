@@ -16,11 +16,14 @@ pub struct WebSocketSession {
 
 impl WebSocketSession {
     /// Create a new WebSocket session
-    pub fn new(config: WebSocketConfig) -> Self {
+    pub fn new(
+        config: WebSocketConfig,
+        subscription_manager: Arc<Mutex<SubscriptionManager>>,
+    ) -> Self {
         Self {
             config: Arc::new(config),
             state: Arc::new(Mutex::new(ConnectionState::Disconnected)),
-            subscription_manager: Arc::new(Mutex::new(SubscriptionManager::new())),
+            subscription_manager,
         }
     }
 
