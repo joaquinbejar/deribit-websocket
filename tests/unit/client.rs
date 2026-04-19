@@ -116,6 +116,53 @@ fn test_client_parse_channel_type() {
     assert!(SubscriptionChannel::from_string("totally.unknown.channel").is_unknown());
 }
 
+#[tokio::test]
+async fn test_client_connect_honors_connection_timeout() {
+    // Defends the wiring of WebSocketConfig::connection_timeout into
+    // Dispatcher::connect from a positional-arg swap regression: a stalled
+    // peer must surface as Timeout within roughly the configured deadline,
+    // not hang. Uses a TcpListener that accepts but never responds, so
+    // connect_async sits in the HTTP upgrade phase until the deadline.
+    use deribit_websocket::error::WebSocketError;
+    use std::time::Duration;
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind ephemeral localhost port");
+    let addr = listener.local_addr().expect("read local addr");
+
+    // Keep the listener alive in a task that accepts but never reads/writes,
+    // so the client's TCP handshake completes but the WS upgrade never does.
+    let _server = tokio::spawn(async move {
+        if let Ok((socket, _)) = listener.accept().await {
+            // Hold the socket open beyond the client's deadline.
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            drop(socket);
+        }
+    });
+
+    let config = WebSocketConfig::with_url(&format!("ws://{}/", addr))
+        .expect("valid ws url")
+        .with_connection_timeout(Duration::from_millis(150));
+    let client = DeribitWebSocketClient::new(&config).expect("client constructs");
+
+    let start = std::time::Instant::now();
+    let result = client.connect().await;
+    let elapsed = start.elapsed();
+
+    assert!(
+        matches!(result, Err(WebSocketError::Timeout(_))),
+        "expected Timeout from stalled handshake, got {:?}",
+        result
+    );
+    assert!(
+        elapsed < Duration::from_millis(500),
+        "timeout should fire near 150ms, elapsed = {:?}",
+        elapsed
+    );
+}
+
 #[test]
 fn test_client_extract_instrument() {
     // The canonical round-trip: build a channel from its typed variant and

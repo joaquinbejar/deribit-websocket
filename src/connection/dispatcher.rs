@@ -81,8 +81,9 @@ impl Dispatcher {
     /// notifications.
     ///
     /// The WebSocket handshake (`connect_async`) is bounded by
-    /// `connection_timeout`: a stalled TCP or TLS handshake fails fast
-    /// with [`WebSocketError::Timeout`] instead of hanging indefinitely.
+    /// `connection_timeout`: a stalled handshake (TCP + TLS + HTTP
+    /// upgrade) fails fast with [`WebSocketError::Timeout`] instead of
+    /// hanging indefinitely.
     ///
     /// # Arguments
     ///

@@ -183,8 +183,8 @@
 //! - **`connection_timeout`** (default 10s, env `DERIBIT_CONNECTION_TIMEOUT`) —
 //!   upper bound on the WebSocket handshake (TCP + TLS + HTTP upgrade).
 //!   A peer that accepts the TCP connection but never completes the
-//!   upgrade makes `connect()` fail with `WebSocketError::Timeout`
-//!   instead of hanging.
+//!   upgrade makes `DeribitWebSocketClient::connect` / `Dispatcher::connect`
+//!   fail with `WebSocketError::Timeout` instead of hanging.
 //! - **`request_timeout`** (default 30s, env `DERIBIT_REQUEST_TIMEOUT`) —
 //!   upper bound on each `send_request` call, covering enqueue, write,
 //!   and response wait. On the deadline the dispatcher evicts the
