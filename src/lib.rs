@@ -194,6 +194,29 @@
 //! Planned follow-ups: `read_idle_timeout` (maximum gap between frames)
 //! and granular per-operation overrides.
 //!
+//! ## Backpressure
+//!
+//! The client and dispatcher communicate over two **bounded**
+//! `tokio::sync::mpsc` channels, both using **Strategy A (await-send)** —
+//! the producer blocks on a full channel, no frame is ever dropped.
+//!
+//! - **`notification_channel_capacity`** (default 1024) — notifications
+//!   from the dispatcher to the consumer. When full, the dispatcher
+//!   stops polling the WebSocket stream and the TCP recv buffer fills,
+//!   which makes the Deribit server apply flow control. Every
+//!   full-channel event emits a `tracing::warn!` so slow consumers are
+//!   visible in logs.
+//! - **`dispatcher_command_capacity`** — outbound commands from the
+//!   client to the dispatcher (request sends, cancel-request on timeout,
+//!   shutdown). When full, the caller blocks until the dispatcher drains
+//!   a slot; `request_timeout` on `send_request` still applies, so the
+//!   caller surfaces `WebSocketError::Timeout` if the deadline elapses
+//!   while waiting on the channel.
+//!
+//! Strategy A was chosen over drop-oldest / drop-newest variants because
+//! the notification stream carries private trading events (order
+//! updates, trade reports) where silent loss is unacceptable.
+//!
 //! ## Architecture
 //!
 //! The client is built with a modular architecture:

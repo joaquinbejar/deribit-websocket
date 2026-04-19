@@ -1,4 +1,39 @@
-//! WebSocket client implementation for Deribit
+//! WebSocket client implementation for Deribit.
+//!
+//! [`DeribitWebSocketClient`] is the public façade. It owns a shared,
+//! optional [`Dispatcher`] that runs the send/receive loop in a dedicated
+//! tokio task; request/response multiplexing and notification routing all
+//! happen inside that task.
+//!
+//! # Channel architecture
+//!
+//! The client–dispatcher split uses **two bounded `tokio::sync::mpsc`
+//! channels**, both using **Strategy A (await-send)**:
+//!
+//! 1. **Notification channel** (dispatcher → consumer). Carries every
+//!    server-pushed notification and every unmatched frame to the
+//!    consumer reading `next_notification` /
+//!    `start_message_processing_loop`. Depth is
+//!    [`WebSocketConfig::notification_channel_capacity`] (default 1024).
+//!    When full, the dispatcher task blocks on `send().await`, stops
+//!    polling the WebSocket stream, and the TCP recv buffer fills →
+//!    the Deribit server applies flow control. Every full-channel event
+//!    emits a `tracing::warn!` so slow consumers are visible in logs.
+//! 2. **Command channel** (client → dispatcher). Carries outbound
+//!    commands — request sends, cancel-request on timeout, shutdown —
+//!    from every client method to the dispatcher. Depth is
+//!    [`WebSocketConfig::dispatcher_command_capacity`]. When full, the
+//!    caller blocks; `request_timeout` on
+//!    [`DeribitWebSocketClient::send_request`] still applies, so the
+//!    caller surfaces [`WebSocketError::Timeout`] if the deadline
+//!    elapses while waiting on the channel.
+//!
+//! Both channels are bounded specifically so that a slow or stuck
+//! consumer can never cause unbounded memory growth in a long-running
+//! trading process. Strategy A (await-send) was chosen over drop-oldest
+//! / drop-newest variants because the notification stream carries
+//! private trading events (order updates, trade reports) where silent
+//! loss is unacceptable.
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
