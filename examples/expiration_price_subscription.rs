@@ -8,10 +8,8 @@ use std::sync::{Arc, Mutex};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize crypto provider for rustls
-    rustls::crypto::aws_lc_rs::default_provider()
-        .install_default()
-        .map_err(|_| "Failed to install crypto provider")?;
+    // Install the rustls crypto provider that matches the active TLS feature.
+    deribit_websocket::install_default_crypto_provider()?;
 
     // Initialize logging
     unsafe {

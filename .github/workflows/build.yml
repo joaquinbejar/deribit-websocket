@@ -3,11 +3,11 @@ name: Build
 on:
   push:
     branches:
-      - '**'
+      - "**"
   pull_request:
     branches:
       - main
-      - 'release/**'
+      - "release/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,12 +19,36 @@ env:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    name: build (${{ matrix.os }} / ${{ matrix.tls }})
 
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-22.04
-          - os: ubuntu-latest
+        os: [ ubuntu-22.04, ubuntu-latest ]
+        tls: [ rustls-aws-lc, rustls-ring, native-tls ]
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        # libssl-dev is only needed for the `native-tls` backend on Linux
+        # but adding it unconditionally keeps the install step identical
+        # across matrix cells.
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            make libfontconfig1-dev pkg-config build-essential libssl-dev
+
+      - name: Build (${{ matrix.tls }})
+        run: cargo build --no-default-features --features ${{ matrix.tls }}
+
+  # Negative-case build: asserts the `compile_error!` mutex in
+  # `src/tls.rs` rejects two TLS backends simultaneously. If the build
+  # ever *succeeds* with this combination, the mutex has silently
+  # regressed and the job fails.
+  mutex-check:
+    runs-on: ubuntu-latest
+    name: mutex-check (rustls-aws-lc + rustls-ring)
 
     steps:
       - uses: actions/checkout@v6
@@ -32,7 +56,25 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update && sudo apt-get install -y make libfontconfig1-dev pkg-config build-essential
+          sudo apt-get update && sudo apt-get install -y \
+            make libfontconfig1-dev pkg-config build-essential
 
-      - name: Build
-        run: make build
+      - name: Confirm the TLS mutex rejects two simultaneous backends
+        run: |
+          set -eu
+          if cargo build --no-default-features \
+               --features "rustls-aws-lc,rustls-ring" 2>build.log
+          then
+            echo "::error::build should have failed with compile_error!"
+            echo "---- build log ----"
+            cat build.log
+            exit 1
+          fi
+          if ! grep -q "select exactly one TLS backend" build.log
+          then
+            echo "::error::expected mutex diagnostic missing from build output"
+            echo "---- build log ----"
+            cat build.log
+            exit 1
+          fi
+          echo "mutex correctly rejected the double-backend build"

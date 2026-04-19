@@ -69,10 +69,10 @@ use deribit_websocket::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize crypto provider for TLS connections
-    rustls::crypto::aws_lc_rs::default_provider()
-        .install_default()
-        .map_err(|_| "Failed to install crypto provider")?;
+    // Install the rustls crypto provider that matches the active TLS feature.
+    // See the crate-level "TLS backends" section or `Cargo features` in the
+    // README for the available backends.
+    deribit_websocket::install_default_crypto_provider()?;
 
     // Create client for testnet
     let config = WebSocketConfig::default();
@@ -221,6 +221,41 @@ The client is built with a modular architecture:
 - **Message Layer** - JSON-RPC request/response and notification handling
 - **Subscription Layer** - Channel management and subscription tracking
 - **Callback Layer** - Flexible message processing with error recovery
+
+### TLS backends
+
+`deribit-websocket` exposes three mutually-exclusive TLS backends as
+Cargo features, with a compile-time mutex (see the `tls` module)
+that rejects any other combination:
+
+| Feature          | Default | Behaviour                                                          |
+| ---------------- | :-----: | ------------------------------------------------------------------ |
+| `rustls-aws-lc`  | ✅      | `rustls` with the `aws-lc-rs` crypto provider + OS root store      |
+| `rustls-ring`    |         | `rustls` with the `ring` crypto provider + OS root store           |
+| `native-tls`     |         | OS-native TLS stack (SChannel / SecureTransport / OpenSSL)         |
+
+Selecting a non-default backend:
+
+```toml
+# Cargo.toml
+[dependencies]
+deribit-websocket = { version = "0.2", default-features = false, features = ["rustls-ring"] }
+```
+
+or, from the command line:
+
+```sh
+cargo add deribit-websocket --no-default-features --features native-tls
+```
+
+Applications must call `install_default_crypto_provider` once at
+startup — it picks the right provider for the active feature and is
+a no-op under `native-tls`.
+
+Because both `rustls-*` backends use the OS-native root store via
+`rustls-native-certs`, minimal container images (Alpine, distroless)
+must have `ca-certificates` (or equivalent) installed so the trust
+store is populated.
 
 ## Contribution and Contact
 
