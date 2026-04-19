@@ -330,12 +330,14 @@ mod tests {
             Some(raw.to_owned()),
         );
         match err {
-            WebSocketError::ApiError { raw_response, .. } => {
-                let stored = raw_response.expect("raw_response should be present");
+            WebSocketError::ApiError {
+                raw_response: Some(stored),
+                ..
+            } => {
                 assert!(!stored.contains("raw-leak"));
                 assert!(stored.contains("***"));
             }
-            other => panic!("expected ApiError, got {other:?}"),
+            other => panic!("expected ApiError with raw_response, got {other:?}"),
         }
     }
 
