@@ -56,18 +56,35 @@ pub(crate) fn redact_params(value: Value) -> Value {
     }
 }
 
-/// Redact a raw response string by parsing it as JSON, redacting, and
-/// re-serialising. Non-JSON input is returned unchanged — it cannot carry
-/// structured secrets, and keeping the original text aids debugging.
+/// Placeholder substituted when [`redact_raw_response`] is given input
+/// that is not parseable as JSON.
+///
+/// Failing closed prevents leakage of secrets that might appear as bare
+/// substrings in non-JSON payloads (HTML error pages, raw log lines,
+/// truncated responses).
+pub(crate) const NON_JSON_PLACEHOLDER: &str = "<non-json response redacted>";
+
+/// Redact a raw response string by parsing it as JSON and recursively
+/// stripping sensitive keys.
+///
+/// **Fails closed**: input that is not valid JSON is replaced with
+/// [`NON_JSON_PLACEHOLDER`] rather than returned verbatim. The redactor
+/// can only reason about JSON structure, so a non-JSON payload that
+/// happens to contain `password=hunter2` would otherwise leak. By
+/// construction every caller in this crate hands `redact_raw_response`
+/// a freshly-serialised JSON envelope (see
+/// [`super::envelope::build_raw_error_response`]), so the placeholder
+/// path is unreachable on the happy path; this is defence in depth for
+/// future callers.
 #[must_use]
 pub(crate) fn redact_raw_response(raw: &str) -> String {
     match serde_json::from_str::<Value>(raw) {
         Ok(value) => {
             let redacted = redact_params(value);
             // Re-serialisation of a valid `Value` cannot fail.
-            serde_json::to_string(&redacted).unwrap_or_else(|_| raw.to_owned())
+            serde_json::to_string(&redacted).unwrap_or_else(|_| NON_JSON_PLACEHOLDER.to_owned())
         }
-        Err(_) => raw.to_owned(),
+        Err(_) => NON_JSON_PLACEHOLDER.to_owned(),
     }
 }
 
@@ -80,7 +97,8 @@ pub(crate) fn redact_raw_response(raw: &str) -> String {
 pub(crate) fn truncate_for_display(s: &str) -> Cow<'_, str> {
     match s.char_indices().nth(MAX_PAYLOAD_DISPLAY_LEN) {
         Some((byte_idx, _)) => {
-            let mut truncated = String::with_capacity(byte_idx.saturating_add(1));
+            let mut truncated =
+                String::with_capacity(byte_idx.saturating_add('…'.len_utf8()));
             truncated.push_str(&s[..byte_idx]);
             truncated.push('…');
             Cow::Owned(truncated)
@@ -242,19 +260,30 @@ mod tests {
     }
 
     #[test]
-    fn redact_raw_response_invalid_json_returns_input_unchanged() {
+    fn redact_raw_response_invalid_json_replaced_with_placeholder() {
         let raw = "not json at all";
-        assert_eq!(redact_raw_response(raw), "not json at all");
+        assert_eq!(redact_raw_response(raw), NON_JSON_PLACEHOLDER);
     }
 
     #[test]
     fn redact_raw_response_invalid_json_does_not_leak_sensitive_like_substrings() {
-        // Non-JSON text that happens to mention "password" is returned
-        // verbatim — the redactor can't parse key/value structure from it.
-        // This is documented behaviour: callers must only pass strings they
-        // know to be JSON envelopes (or accept that non-JSON survives).
+        // Non-JSON text that happens to mention "password" must NOT be
+        // returned verbatim — the redactor cannot reason about key/value
+        // structure in arbitrary text, so it fails closed.
         let raw = "password=hunter2 (raw log line)";
-        assert_eq!(redact_raw_response(raw), raw);
+        let out = redact_raw_response(raw);
+        assert_eq!(out, NON_JSON_PLACEHOLDER);
+        assert!(!out.contains("hunter2"));
+    }
+
+    #[test]
+    fn redact_raw_response_truncated_json_fails_closed() {
+        // A response that was cut off mid-JSON would parse-fail; ensure
+        // we still don't leak any sensitive substrings it carried.
+        let raw = r#"{"access_token":"leak-me","id":1"#;
+        let out = redact_raw_response(raw);
+        assert_eq!(out, NON_JSON_PLACEHOLDER);
+        assert!(!out.contains("leak-me"));
     }
 
     #[test]
