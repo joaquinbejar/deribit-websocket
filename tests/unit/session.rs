@@ -44,7 +44,10 @@ fn test_websocket_session_with_custom_config() {
 #[test]
 fn test_websocket_session_arc_compatibility() {
     let config = WebSocketConfig::default();
-    let session = Arc::new(WebSocketSession::new(Arc::new(config), make_subscription_manager()));
+    let session = Arc::new(WebSocketSession::new(
+        Arc::new(config),
+        make_subscription_manager(),
+    ));
 
     // Test that session can be wrapped in Arc (for thread safety)
     let session_clone = session.clone();

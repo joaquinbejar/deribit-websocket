@@ -1,6 +1,8 @@
-//! Logger setup utility for the deribit-websocket crate
+//! `tracing` subscriber setup, driven by `DERIBIT_LOG_LEVEL`.
 //!
-//! Provides a simple logger configuration based on environment variables.
+//! Installs a [`FmtSubscriber`] as the process-global default. The
+//! level comes from the `DERIBIT_LOG_LEVEL` environment variable read
+//! on the first call; subsequent calls are no-ops.
 
 use std::env;
 use std::sync::Once;
@@ -9,13 +11,23 @@ use tracing_subscriber::FmtSubscriber;
 
 static INIT: Once = Once::new();
 
-/// Sets up the logger for the application.
+/// Install the `tracing` subscriber used by every example and binary
+/// in the crate.
 ///
-/// The logger level is determined by the `DERIBIT_LOG_LEVEL` environment variable.
-/// If the variable is not set, it defaults to `INFO`.
+/// The level is read from the `DERIBIT_LOG_LEVEL` environment variable
+/// once, on the first call. Recognised values: `TRACE`, `DEBUG`,
+/// `INFO`, `WARN`, `ERROR`. Anything else (or an unset variable)
+/// defaults to `INFO`.
 ///
-/// This function is safe to call multiple times - it will only initialize
-/// the logger once.
+/// The subscriber is registered as the *process-global* default via
+/// [`tracing::subscriber::set_global_default`], which `tracing` allows
+/// only once per process. A [`Once`] guard makes subsequent calls to
+/// this function safe: they return immediately without touching the
+/// already-installed subscriber, so applications that wire logging
+/// from multiple entry points (tests, libs, `main`) do not race.
+///
+/// Changing `DERIBIT_LOG_LEVEL` after the first call has no effect —
+/// tracing does not support replacing the global default at runtime.
 ///
 /// # Example
 ///

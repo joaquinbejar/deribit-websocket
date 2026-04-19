@@ -29,17 +29,17 @@ pub struct WebSocketConfig {
     pub client_id: Option<String>,
     /// Client secret for authentication
     pub client_secret: Option<String>,
-    /// Per-request timeout for [`DeribitWebSocketClient::send_request`].
+    /// Per-request timeout for [`crate::client::DeribitWebSocketClient::send_request`].
     ///
     /// Every call that awaits a matching JSON-RPC response is bounded by
     /// this duration. If the response does not arrive in time, the call
-    /// returns [`WebSocketError::Timeout`].
+    /// returns [`crate::error::WebSocketError::Timeout`].
     pub request_timeout: Duration,
     /// Notification channel capacity (frames buffered for the consumer).
     ///
     /// Depth of the bounded `tokio::sync::mpsc` that carries server-pushed
     /// notifications (and any unmatched frames) from the dispatcher task
-    /// to [`DeribitWebSocketClient::receive_message`] /
+    /// to [`crate::client::DeribitWebSocketClient::receive_message`] /
     /// `start_message_processing_loop`.
     ///
     /// # Backpressure — Strategy A (await-send)
@@ -68,13 +68,13 @@ pub struct WebSocketConfig {
     /// # Backpressure — Strategy A (await-send)
     ///
     /// When the channel is full, callers of
-    /// [`DeribitWebSocketClient::send_request`] /
-    /// [`DeribitWebSocketClient::disconnect`] block on `send().await`
+    /// [`crate::client::DeribitWebSocketClient::send_request`] /
+    /// [`crate::client::DeribitWebSocketClient::disconnect`] block on `send().await`
     /// until the dispatcher drains a slot. Blocking here means the
     /// application is issuing requests faster than the dispatcher can
     /// write them to the socket; the `request_timeout` bound on
     /// `send_request` still applies, so the caller sees a
-    /// [`WebSocketError::Timeout`] if the deadline elapses while
+    /// [`crate::error::WebSocketError::Timeout`] if the deadline elapses while
     /// waiting on the command channel.
     pub dispatcher_command_capacity: usize,
 }
@@ -102,7 +102,7 @@ impl WebSocketConfig {
     /// Construct a configuration from environment variables, propagating
     /// parse errors for any user-supplied URL.
     ///
-    /// Loads `.env` once via [`Self::load_env`], reads `DERIBIT_WS_URL`
+    /// Loads `.env` once via `Self::load_env`, reads `DERIBIT_WS_URL`
     /// (falling back to [`constants::PRODUCTION_WS_URL`] when unset), and
     /// parses it. All other fields follow the same env-or-default strategy as
     /// [`Default`] but never fail.
@@ -127,7 +127,7 @@ impl WebSocketConfig {
     ///
     /// Non-URL fields are populated from environment variables using the
     /// same rules as [`Default`]; only the URL is overridden. `.env` is
-    /// loaded once via [`Self::load_env`] before any env var is read.
+    /// loaded once via `Self::load_env` before any env var is read.
     ///
     /// # Errors
     ///
@@ -152,7 +152,7 @@ impl WebSocketConfig {
     /// Private helper: populate every field except `ws_url` from environment
     /// variables (with sensible defaults) and combine them with the given URL.
     ///
-    /// The caller is responsible for calling [`Self::load_env`] beforehand so
+    /// The caller is responsible for calling `Self::load_env` beforehand so
     /// that `.env` overrides are visible to `std::env::var`. Every public
     /// constructor satisfies this invariant.
     fn from_parts(ws_url: Url) -> Self {

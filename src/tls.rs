@@ -83,8 +83,8 @@ pub enum CryptoProviderError {
 ///   OS TLS stack does not require any process-level initialization.
 ///
 /// Call this exactly once at application startup, before any call to
-/// [`crate::DeribitWebSocketClient::connect`]. Subsequent calls return
-/// [`CryptoProviderError::AlreadyInstalled`] rather than panic, which
+/// [`crate::client::DeribitWebSocketClient::connect`]. Subsequent calls
+/// return [`CryptoProviderError::AlreadyInstalled`] rather than panic, which
 /// lets callers be robust against multiple entry points (tests, libs,
 /// `main`) all trying to initialize the provider.
 ///
