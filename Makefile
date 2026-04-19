@@ -32,20 +32,28 @@ fmt:
 fmt-check:
 	cargo +stable fmt --check
 
-# Run Clippy for linting
+# Run Clippy for linting.
+#
+# NOTE: we explicitly avoid `--all-features` because the three TLS backends
+# (`rustls-aws-lc`, `rustls-ring`, `native-tls`) are mutually exclusive and
+# guarded by a `compile_error!` mutex in `src/tls.rs`. Activating all of
+# them simultaneously is the failure mode we *want* to reject at compile
+# time, but it is not a useful lint target. Instead we lint the default
+# backend (`rustls-aws-lc`) plus `integration-tests`; the per-backend
+# compile matrix lives in CI (`.github/workflows/build.yml`).
 .PHONY: lint
 lint:
-	cargo clippy --all-targets --all-features -- -D warnings
+	cargo clippy --all-targets --features integration-tests -- -D warnings
 
 # Strict lints for the library + test targets only. Examples and benches are
 # intentionally excluded so illustrative code can still use `.unwrap()`.
 .PHONY: lint-strict
 lint-strict:
-	cargo clippy --lib --tests --all-features -- -D warnings -D clippy::unwrap_used -D clippy::expect_used
+	cargo clippy --lib --tests --features integration-tests -- -D warnings -D clippy::unwrap_used -D clippy::expect_used
 
 .PHONY: lint-fix
 lint-fix: 
-	cargo clippy --fix --all-targets --all-features --allow-dirty --allow-staged -- -D warnings
+	cargo clippy --fix --all-targets --features integration-tests --allow-dirty --allow-staged -- -D warnings
 
 # Clean the project
 .PHONY: clean
