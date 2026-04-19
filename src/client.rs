@@ -103,6 +103,7 @@ impl DeribitWebSocketClient {
         }
         let dispatcher = Dispatcher::connect(
             self.config.ws_url.clone(),
+            self.config.connection_timeout,
             self.config.request_timeout,
             self.config.notification_channel_capacity,
             self.config.dispatcher_command_capacity,
