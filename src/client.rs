@@ -46,7 +46,7 @@ use crate::{
     callback::MessageHandler,
     config::WebSocketConfig,
     connection::Dispatcher,
-    error::WebSocketError,
+    error::{WebSocketError, envelope::build_raw_error_response},
     message::request::RequestBuilder,
     model::{
         quote::*,
@@ -208,12 +208,7 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -339,12 +334,7 @@ impl DeribitWebSocketClient {
                 })
             }
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -388,12 +378,7 @@ impl DeribitWebSocketClient {
                 })
             }
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -478,12 +463,7 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse test response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -520,12 +500,7 @@ impl DeribitWebSocketClient {
                 )
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -570,12 +545,7 @@ impl DeribitWebSocketClient {
                 })
             }
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -614,12 +584,7 @@ impl DeribitWebSocketClient {
                 })
             }
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -664,12 +629,7 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse hello response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -710,12 +670,7 @@ impl DeribitWebSocketClient {
                 })
             }
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -755,12 +710,7 @@ impl DeribitWebSocketClient {
                 })
             }
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -804,12 +754,7 @@ impl DeribitWebSocketClient {
                     })
             }
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -844,12 +789,7 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -881,12 +821,7 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -909,12 +844,7 @@ impl DeribitWebSocketClient {
         match response.result {
             JsonRpcResult::Success { .. } => Ok(()),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -945,12 +875,7 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -973,12 +898,7 @@ impl DeribitWebSocketClient {
         match response.result {
             JsonRpcResult::Success { .. } => Ok(()),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1011,12 +931,7 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1052,12 +967,7 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse buy response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1093,12 +1003,7 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse sell response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1134,12 +1039,7 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse cancel response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1171,12 +1071,7 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1212,12 +1107,7 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1256,12 +1146,7 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1297,12 +1182,7 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse edit response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1348,12 +1228,7 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse positions response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1400,12 +1275,7 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1450,12 +1320,7 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1504,12 +1369,7 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1560,12 +1420,7 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,
@@ -1616,12 +1471,7 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                let raw = serde_json::json!({
-                    "jsonrpc": &response.jsonrpc,
-                    "id": &response.id,
-                    "error": &error,
-                })
-                .to_string();
+                let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
                     &request_ctx,
                     error,

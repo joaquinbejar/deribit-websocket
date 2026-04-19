@@ -1,6 +1,7 @@
 //! Error handling module for WebSocket client
 
 pub(crate) mod display;
+pub(crate) mod envelope;
 pub(crate) mod redaction;
 
 use serde_json::Value;
