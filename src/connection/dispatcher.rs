@@ -80,9 +80,16 @@ impl Dispatcher {
     /// dispatcher task that services JSON-RPC requests and forwards
     /// notifications.
     ///
+    /// The WebSocket handshake (`connect_async`) is bounded by
+    /// `connection_timeout`: a stalled TCP or TLS handshake fails fast
+    /// with [`WebSocketError::Timeout`] instead of hanging indefinitely.
+    ///
     /// # Arguments
     ///
     /// - `url` — WebSocket URL to connect to.
+    /// - `connection_timeout` — upper bound on the `connect_async`
+    ///   handshake (TCP + TLS + HTTP upgrade). Exceeded means the peer
+    ///   never completed the upgrade.
     /// - `request_timeout` — upper bound for each `send_request` call.
     /// - `notification_capacity` — depth of the bounded notifications
     ///   channel. Slow consumers apply back-pressure on the dispatcher.
@@ -90,16 +97,27 @@ impl Dispatcher {
     ///
     /// # Errors
     ///
-    /// Returns [`WebSocketError::ConnectionFailed`] if the underlying
-    /// `connect_async` handshake fails.
+    /// - [`WebSocketError::Timeout`] if the handshake does not complete
+    ///   within `connection_timeout`.
+    /// - [`WebSocketError::ConnectionFailed`] if the underlying
+    ///   `connect_async` handshake returns an error (DNS, TCP refused,
+    ///   TLS failure, bad upgrade response, etc.).
     pub async fn connect(
         url: Url,
+        connection_timeout: Duration,
         request_timeout: Duration,
         notification_capacity: usize,
         cmd_capacity: usize,
     ) -> Result<Self, WebSocketError> {
-        let (stream, _response) = connect_async(url.as_str())
+        let handshake = tokio::time::timeout(connection_timeout, connect_async(url.as_str()))
             .await
+            .map_err(|_| {
+                WebSocketError::Timeout(format!(
+                    "connection_timeout {:?} elapsed during handshake",
+                    connection_timeout
+                ))
+            })?;
+        let (stream, _response) = handshake
             .map_err(|e| WebSocketError::ConnectionFailed(format!("Failed to connect: {}", e)))?;
         let (sink, stream) = stream.split();
         let (cmd_tx, cmd_rx) = mpsc::channel::<DispatcherCommand>(cmd_capacity);
@@ -411,9 +429,15 @@ mod tests {
         })
         .await;
 
-        let dispatcher = Dispatcher::connect(ws_url(addr), Duration::from_secs(5), 16, 16)
-            .await
-            .expect("dispatcher connects");
+        let dispatcher = Dispatcher::connect(
+            ws_url(addr),
+            Duration::from_secs(5),
+            Duration::from_secs(5),
+            16,
+            16,
+        )
+        .await
+        .expect("dispatcher connects");
         let response = dispatcher
             .send_request(make_request(42, "public/test"))
             .await
@@ -437,9 +461,15 @@ mod tests {
         })
         .await;
 
-        let dispatcher = Dispatcher::connect(ws_url(addr), Duration::from_secs(5), 16, 16)
-            .await
-            .expect("dispatcher connects");
+        let dispatcher = Dispatcher::connect(
+            ws_url(addr),
+            Duration::from_secs(5),
+            Duration::from_secs(5),
+            16,
+            16,
+        )
+        .await
+        .expect("dispatcher connects");
         let text = tokio::time::timeout(Duration::from_secs(2), dispatcher.next_notification())
             .await
             .expect("notification arrives within timeout")
@@ -483,9 +513,15 @@ mod tests {
         .await;
 
         let dispatcher = Arc::new(
-            Dispatcher::connect(ws_url(addr), Duration::from_secs(5), 16, 16)
-                .await
-                .expect("dispatcher connects"),
+            Dispatcher::connect(
+                ws_url(addr),
+                Duration::from_secs(5),
+                Duration::from_secs(5),
+                16,
+                16,
+            )
+            .await
+            .expect("dispatcher connects"),
         );
 
         let mut handles = Vec::new();
@@ -556,9 +592,15 @@ mod tests {
         // Use a generous notification buffer so we don't stall on the 100
         // burst while the consumer is still spinning up.
         let dispatcher = Arc::new(
-            Dispatcher::connect(ws_url(addr), Duration::from_secs(5), 512, 16)
-                .await
-                .expect("dispatcher connects"),
+            Dispatcher::connect(
+                ws_url(addr),
+                Duration::from_secs(5),
+                Duration::from_secs(5),
+                512,
+                16,
+            )
+            .await
+            .expect("dispatcher connects"),
         );
 
         // Drain notifications concurrently.
@@ -632,9 +674,15 @@ mod tests {
         })
         .await;
 
-        let dispatcher = Dispatcher::connect(ws_url(addr), Duration::from_millis(200), 16, 16)
-            .await
-            .expect("dispatcher connects");
+        let dispatcher = Dispatcher::connect(
+            ws_url(addr),
+            Duration::from_secs(5),
+            Duration::from_millis(200),
+            16,
+            16,
+        )
+        .await
+        .expect("dispatcher connects");
         let start = std::time::Instant::now();
         let result = dispatcher
             .send_request(make_request(7, "public/test"))
@@ -665,9 +713,15 @@ mod tests {
         })
         .await;
 
-        let dispatcher = Dispatcher::connect(ws_url(addr), Duration::from_secs(5), 16, 16)
-            .await
-            .expect("dispatcher connects");
+        let dispatcher = Dispatcher::connect(
+            ws_url(addr),
+            Duration::from_secs(5),
+            Duration::from_secs(5),
+            16,
+            16,
+        )
+        .await
+        .expect("dispatcher connects");
         let result = dispatcher
             .send_request(make_request(99, "public/test"))
             .await;
@@ -712,9 +766,15 @@ mod tests {
         })
         .await;
 
-        let dispatcher = Dispatcher::connect(ws_url(addr), Duration::from_millis(100), 16, 16)
-            .await
-            .expect("dispatcher connects");
+        let dispatcher = Dispatcher::connect(
+            ws_url(addr),
+            Duration::from_secs(5),
+            Duration::from_millis(100),
+            16,
+            16,
+        )
+        .await
+        .expect("dispatcher connects");
         let result = dispatcher
             .send_request(make_request(7, "public/test"))
             .await;
@@ -770,9 +830,15 @@ mod tests {
         .await;
 
         let dispatcher = Arc::new(
-            Dispatcher::connect(ws_url(addr), Duration::from_secs(5), 16, 16)
-                .await
-                .expect("dispatcher connects"),
+            Dispatcher::connect(
+                ws_url(addr),
+                Duration::from_secs(5),
+                Duration::from_secs(5),
+                16,
+                16,
+            )
+            .await
+            .expect("dispatcher connects"),
         );
 
         // Spawn the first request; it parks until the server replies.
@@ -822,9 +888,15 @@ mod tests {
         })
         .await;
 
-        let dispatcher = Dispatcher::connect(ws_url(addr), Duration::from_secs(5), 16, 16)
-            .await
-            .expect("dispatcher connects");
+        let dispatcher = Dispatcher::connect(
+            ws_url(addr),
+            Duration::from_secs(5),
+            Duration::from_secs(5),
+            16,
+            16,
+        )
+        .await
+        .expect("dispatcher connects");
         let text = tokio::time::timeout(Duration::from_secs(2), dispatcher.next_notification())
             .await
             .expect("unmatched id arrives within timeout")
@@ -883,9 +955,15 @@ mod tests {
         .await;
 
         let dispatcher = Arc::new(
-            Dispatcher::connect(ws_url(addr), Duration::from_secs(5), 64, 64)
-                .await
-                .expect("dispatcher connects"),
+            Dispatcher::connect(
+                ws_url(addr),
+                Duration::from_secs(5),
+                Duration::from_secs(5),
+                64,
+                64,
+            )
+            .await
+            .expect("dispatcher connects"),
         );
 
         let start = std::time::Instant::now();
