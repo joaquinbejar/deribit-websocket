@@ -15,13 +15,19 @@ pub struct WebSocketSession {
 }
 
 impl WebSocketSession {
-    /// Create a new WebSocket session
+    /// Create a new WebSocket session.
+    ///
+    /// Takes the configuration as an `Arc<WebSocketConfig>` so it can be
+    /// shared with [`DeribitWebSocketClient`](crate::DeribitWebSocketClient)
+    /// (which stores the same `Arc`) without deep-copying the config
+    /// struct. Callers that start from an owned `WebSocketConfig` should
+    /// wrap it once via `Arc::new(config)` before calling.
     pub fn new(
-        config: WebSocketConfig,
+        config: Arc<WebSocketConfig>,
         subscription_manager: Arc<Mutex<SubscriptionManager>>,
     ) -> Self {
         Self {
-            config: Arc::new(config),
+            config,
             state: Arc::new(Mutex::new(ConnectionState::Disconnected)),
             subscription_manager,
         }
