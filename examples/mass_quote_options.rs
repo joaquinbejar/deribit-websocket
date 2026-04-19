@@ -116,10 +116,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Step 1: Create MMP group for options trading.
     //
     // MMP configuration requires the feature to be activated on the
-    // account by Deribit staff. A 11050 `bad_request` with payload
-    // `"MMP disabled"` is the expected response on accounts without
-    // activation — log it and carry on so the rest of the demo still
-    // exercises its API surface without crashing.
+    // account by Deribit staff. A `11050 bad_request` with payload
+    // `"MMP disabled"` is the specific response on accounts without
+    // activation — only that case is treated as non-fatal so the demo
+    // keeps exercising its API surface. Any other error still
+    // propagates so auth, serialization, or connectivity failures
+    // surface immediately.
     tracing::info!("📋 Setting up options MMP group...");
 
     let options_mmp_config = MmpGroupConfig::new(
@@ -132,10 +134,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match client.set_mmp_config(options_mmp_config).await {
         Ok(()) => tracing::info!("✅ Options MMP group 'btc_options_mm' configured"),
-        Err(e) => tracing::warn!(
-            "⚠️  Options MMP group config failed: {} — expected if MMP is not activated",
-            e
+        Err(WebSocketError::ApiError {
+            code: 11050,
+            message,
+            ..
+        }) => tracing::warn!(
+            "⚠️  Options MMP group skipped: {} (code 11050 — MMP not activated on this account)",
+            message
         ),
+        Err(e) => return Err(e.into()),
     }
 
     // Step 2: Create options quotes for calls and puts

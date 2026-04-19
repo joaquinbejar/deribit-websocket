@@ -128,10 +128,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     // MMP configuration requires the feature to be activated on the
-    // account by Deribit staff. A 11050 `bad_request` with payload
-    // `"MMP disabled"` is the expected response on accounts without
-    // activation — log it and carry on so the rest of the demo still
-    // exercises its API surface without crashing.
+    // account by Deribit staff. A `11050 bad_request` with payload
+    // `"MMP disabled"` is the specific response on accounts without
+    // activation — only that case is treated as non-fatal so the demo
+    // keeps exercising its API surface. Any other error (auth,
+    // serialization, connectivity, validation, ...) still propagates
+    // and fails the example fast.
     for (group_name, qty_limit, delta_limit, interval, frozen_time) in &mmp_groups {
         let config = MmpGroupConfig::new(
             group_name.to_string(),
@@ -143,11 +145,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         match client.set_mmp_config(config).await {
             Ok(()) => tracing::info!("✅ MMP group '{}' configured", group_name),
-            Err(e) => tracing::warn!(
-                "⚠️  MMP group '{}' config failed: {} — expected if MMP is not activated",
+            Err(WebSocketError::ApiError {
+                code: 11050,
+                message,
+                ..
+            }) => tracing::warn!(
+                "⚠️  MMP group '{}' skipped: {} (code 11050 — MMP not activated on this account)",
                 group_name,
-                e
+                message
             ),
+            Err(e) => return Err(e.into()),
         }
     }
 
