@@ -72,97 +72,12 @@ dotenv = { workspace = true }
 serial_test = "3.4"
 dotenv = "0.15"
 
-# All examples call `install_default_crypto_provider()` which only
-# exists under the rustls backends. Gating via `required-features`
-# means `cargo build --examples` under `native-tls` silently skips
-# them rather than failing to compile.
-[[example]]
-name = "account_operations"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "advanced_subscriptions"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "basic_client"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "callback_example"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "cancel_on_disconnect"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "expiration_price_subscription"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "mark_price_subscription"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "mass_quote_advanced"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "mass_quote_basic"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "mass_quote_options"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "new_channels_subscription"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "perpetual_subscription"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "portfolio_subscription"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "position_management"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "price_index_subscription"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "quote_subscription"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "session_management"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "trades_subscription"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "trading_operations"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "unsubscribe_all"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "user_orders_subscription"
-required-features = ["rustls-aws-lc"]
-
-[[example]]
-name = "user_trades_subscription"
-required-features = ["rustls-aws-lc"]
+# Examples are intentionally *not* gated via `required-features`:
+# `install_default_crypto_provider()` is available under every TLS
+# backend (no-op under `native-tls`), so `cargo build --examples` works
+# with any single TLS feature active. The crate-level `compile_error!`
+# mutex in `src/tls.rs` still rejects zero- or multi-backend builds, so
+# the example set can never be compiled against a misconfigured crate.
 
 [workspace.dependencies]
 pretty-simple-display = "0.1"

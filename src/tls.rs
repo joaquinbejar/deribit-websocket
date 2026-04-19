@@ -104,8 +104,8 @@ pub enum CryptoProviderError {
 /// # Ok(())
 /// # }
 /// ```
-#[must_use = "the crypto provider install result must be handled; dropping it hides \
-              AlreadyInstalled and subsequent TLS handshakes will silently fail"]
+// `Result` already carries `#[must_use]`, so an extra attribute on the
+// function itself would be redundant (see `clippy::double_must_use`).
 #[inline(never)]
 // The explicit `return`s below are load-bearing: without them the
 // function body would have multiple `#[cfg]`-gated tail expressions and

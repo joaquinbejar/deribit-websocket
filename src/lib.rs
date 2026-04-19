@@ -56,8 +56,7 @@
 //!     // Install the rustls crypto provider that matches the active TLS feature.
 //!     // See the crate-level "TLS backends" section or `Cargo features` in the
 //!     // README for the available backends.
-//!     deribit_websocket::install_default_crypto_provider()
-//!         .map_err(|e| format!("Failed to install crypto provider: {e}"))?;
+//!     deribit_websocket::install_default_crypto_provider()?;
 //!
 //!     // Create client for testnet
 //!     let config = WebSocketConfig::default();
@@ -233,8 +232,8 @@
 //! ## TLS backends
 //!
 //! `deribit-websocket` exposes three mutually-exclusive TLS backends as
-//! Cargo features, with a compile-time mutex (see [`tls`]) that rejects
-//! any other combination:
+//! Cargo features, with a compile-time mutex (see the `tls` module)
+//! that rejects any other combination:
 //!
 //! | Feature          | Default | Behaviour                                                          |
 //! | ---------------- | :-----: | ------------------------------------------------------------------ |
@@ -256,7 +255,7 @@
 //! cargo add deribit-websocket --no-default-features --features native-tls
 //! ```
 //!
-//! Applications must call [`install_default_crypto_provider`] once at
+//! Applications must call `install_default_crypto_provider` once at
 //! startup — it picks the right provider for the active feature and is
 //! a no-op under `native-tls`.
 //!

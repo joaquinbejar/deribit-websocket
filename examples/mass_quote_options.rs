@@ -12,8 +12,7 @@ use std::sync::{Arc, Mutex};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Install the rustls crypto provider that matches the active TLS feature.
-    deribit_websocket::install_default_crypto_provider()
-        .map_err(|e| format!("Failed to install crypto provider: {e}"))?;
+    deribit_websocket::install_default_crypto_provider()?;
 
     setup_logger();
     let mut client = DeribitWebSocketClient::default();
