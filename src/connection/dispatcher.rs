@@ -38,11 +38,21 @@ use crate::model::ws_types::{JsonRpcRequest, JsonRpcResponse};
 /// [`Dispatcher::send_request`] / [`Dispatcher::shutdown`].
 #[derive(Debug)]
 enum DispatcherCommand {
-    /// Send a JSON-RPC request and route the matching response back via
-    /// the attached oneshot responder.
+    /// Send a pre-serialised JSON-RPC request and route the matching
+    /// response back via the attached oneshot responder.
+    ///
+    /// `payload` is the wire-ready JSON text and `id` is the request id
+    /// extracted from it; both are computed by the caller (see
+    /// [`Dispatcher::send_request`]) so the dispatcher loop never needs
+    /// to deserialise or re-serialise the request, and the caller does
+    /// not have to clone the [`JsonRpcRequest`] just to surface
+    /// id-validation or serialisation errors.
     SendRequest {
-        /// The request to serialize and write to the WebSocket sink.
-        request: JsonRpcRequest,
+        /// The serialised JSON-RPC request, ready for `sink.send`.
+        payload: String,
+        /// JSON-RPC `id` of `payload`. Used for the duplicate-in-flight
+        /// check and for cancel-on-timeout routing.
+        id: u64,
         /// Channel used to deliver the response (or an error) to the caller.
         responder: oneshot::Sender<Result<JsonRpcResponse, WebSocketError>>,
     },
@@ -164,17 +174,35 @@ impl Dispatcher {
     /// - [`WebSocketError::InvalidMessage`] if the request `id` is not a
     ///   `u64`, the request `id` is already in flight, or the response
     ///   payload cannot be parsed.
+    /// - [`WebSocketError::Serialization`] if the request cannot be
+    ///   serialised to JSON (for example a non-finite `f64` in `params`).
     /// - [`WebSocketError::ConnectionFailed`] if the sink reports an
     ///   error while writing.
     /// - [`WebSocketError::ConnectionClosed`] if the stream closed while
     ///   the waiter was pending.
+    ///
+    /// `request` is borrowed: serialisation happens up front in the
+    /// caller's task, so the caller retains ownership and does not need
+    /// to clone the (potentially large) `params` for error-context
+    /// capture on the success path.
     pub async fn send_request(
         &self,
-        request: JsonRpcRequest,
+        request: &JsonRpcRequest,
     ) -> Result<JsonRpcResponse, WebSocketError> {
-        let id = request.id.as_u64();
+        // id-validation and serialisation are done synchronously here
+        // (before the deadline starts) so failures surface without
+        // round-tripping through the dispatcher task.
+        let id = request
+            .id
+            .as_u64()
+            .ok_or_else(|| WebSocketError::InvalidMessage("request id must be u64".to_string()))?;
+        let payload = serde_json::to_string(request)?;
         let (responder, waiter) = oneshot::channel();
-        let cmd = DispatcherCommand::SendRequest { request, responder };
+        let cmd = DispatcherCommand::SendRequest {
+            payload,
+            id,
+            responder,
+        };
         let outcome = tokio::time::timeout(self.request_timeout, async {
             self.cmd_tx
                 .send(cmd)
@@ -186,12 +214,10 @@ impl Dispatcher {
         match outcome {
             Ok(result) => result,
             Err(_elapsed) => {
-                if let Some(id) = id {
-                    let _ = self
-                        .cmd_tx
-                        .send(DispatcherCommand::CancelRequest { id })
-                        .await;
-                }
+                let _ = self
+                    .cmd_tx
+                    .send(DispatcherCommand::CancelRequest { id })
+                    .await;
                 Err(WebSocketError::Timeout(format!(
                     "request_timeout {:?} elapsed",
                     self.request_timeout
@@ -245,19 +271,13 @@ async fn run_dispatcher(
         tokio::select! {
             cmd = cmd_rx.recv() => {
                 match cmd {
-                    Some(DispatcherCommand::SendRequest { request, responder }) => {
-                        // Request ids must be numeric u64s. RequestBuilder
-                        // always emits Value::Number here; any other shape
-                        // is a programmer error.
-                        let id = match request.id.as_u64() {
-                            Some(n) => n,
-                            None => {
-                                let _ = responder.send(Err(WebSocketError::InvalidMessage(
-                                    "request id must be u64".to_string(),
-                                )));
-                                continue;
-                            }
-                        };
+                    Some(DispatcherCommand::SendRequest { payload, id, responder }) => {
+                        // id-validation and serialisation already happened
+                        // in `Dispatcher::send_request` (caller's task); the
+                        // only check that has to live in the dispatcher
+                        // task is duplicate-in-flight, because only this
+                        // task owns the `waiters` map.
+                        //
                         // Reject duplicate in-flight ids — silent overwrite
                         // would orphan the existing waiter and could
                         // mis-route the original response.
@@ -267,15 +287,6 @@ async fn run_dispatcher(
                             )));
                             continue;
                         }
-                        let payload = match serde_json::to_string(&request) {
-                            Ok(s) => s,
-                            Err(e) => {
-                                let _ = responder.send(Err(WebSocketError::InvalidMessage(
-                                    format!("serialize: {}", e),
-                                )));
-                                continue;
-                            }
-                        };
                         // Register the waiter BEFORE writing so a fast
                         // server reply can find it.
                         waiters.insert(id, responder);
@@ -548,8 +559,9 @@ mod tests {
         )
         .await
         .expect("dispatcher connects");
+        let req = make_request(42, "public/test");
         let response = dispatcher
-            .send_request(make_request(42, "public/test"))
+            .send_request(&req)
             .await
             .expect("response arrives");
         assert_eq!(response.id, serde_json::Value::Number(42.into()));
@@ -638,7 +650,8 @@ mod tests {
         for id in [10u64, 11, 12] {
             let d = Arc::clone(&dispatcher);
             handles.push(tokio::spawn(async move {
-                d.send_request(make_request(id, "public/test")).await
+                let req = make_request(id, "public/test");
+                d.send_request(&req).await
             }));
         }
         for (expected_id, handle) in [10u64, 11, 12].into_iter().zip(handles) {
@@ -736,7 +749,8 @@ mod tests {
         for id in [100u64, 101, 102] {
             let d = Arc::clone(&dispatcher);
             handles.push(tokio::spawn(async move {
-                d.send_request(make_request(id, "public/test")).await
+                let req = make_request(id, "public/test");
+                d.send_request(&req).await
             }));
         }
         for (expected_id, handle) in [100u64, 101, 102].into_iter().zip(handles) {
@@ -794,9 +808,8 @@ mod tests {
         .await
         .expect("dispatcher connects");
         let start = std::time::Instant::now();
-        let result = dispatcher
-            .send_request(make_request(7, "public/test"))
-            .await;
+        let req = make_request(7, "public/test");
+        let result = dispatcher.send_request(&req).await;
         let elapsed = start.elapsed();
         assert!(
             matches!(result, Err(WebSocketError::Timeout(_))),
@@ -832,9 +845,8 @@ mod tests {
         )
         .await
         .expect("dispatcher connects");
-        let result = dispatcher
-            .send_request(make_request(99, "public/test"))
-            .await;
+        let req = make_request(99, "public/test");
+        let result = dispatcher.send_request(&req).await;
         assert!(
             matches!(result, Err(WebSocketError::ConnectionClosed)),
             "expected ConnectionClosed after server close, got {:?}",
@@ -885,9 +897,8 @@ mod tests {
         )
         .await
         .expect("dispatcher connects");
-        let result = dispatcher
-            .send_request(make_request(7, "public/test"))
-            .await;
+        let req = make_request(7, "public/test");
+        let result = dispatcher.send_request(&req).await;
         assert!(
             matches!(result, Err(WebSocketError::Timeout(_))),
             "expected Timeout, got {:?}",
@@ -954,16 +965,18 @@ mod tests {
         // Spawn the first request; it parks until the server replies.
         let first = {
             let d = Arc::clone(&dispatcher);
-            tokio::spawn(async move { d.send_request(make_request(42, "public/test")).await })
+            tokio::spawn(async move {
+                let req = make_request(42, "public/test");
+                d.send_request(&req).await
+            })
         };
 
         // Briefly yield so the dispatcher registers the waiter for id=42.
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         // Second request with the same id must be rejected immediately.
-        let dup = dispatcher
-            .send_request(make_request(42, "public/test"))
-            .await;
+        let dup_req = make_request(42, "public/test");
+        let dup = dispatcher.send_request(&dup_req).await;
         assert!(
             matches!(dup, Err(WebSocketError::InvalidMessage(ref m)) if m.contains("duplicate")),
             "duplicate id must be rejected with InvalidMessage, got {:?}",
@@ -1082,7 +1095,8 @@ mod tests {
             let d = Arc::clone(&dispatcher);
             let id = 1000u64 + i as u64;
             handles.push(tokio::spawn(async move {
-                d.send_request(make_request(id, "public/test")).await
+                let req = make_request(id, "public/test");
+                d.send_request(&req).await
             }));
         }
         for handle in handles {
