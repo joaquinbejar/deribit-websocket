@@ -54,11 +54,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let incremental_ticker = SubscriptionChannel::IncrementalTicker("BTC-PERPETUAL".to_string());
     tracing::info!("Incremental ticker channel: {}", incremental_ticker);
 
-    // 3. Trades by Kind - trades for all futures or options
+    // 3. Trades by Kind - trades for all futures or options.
+    //
+    // NOTE: the `raw` interval requires authentication — unauthenticated
+    // callers get server code 13778
+    // (`raw_subscriptions_not_available_for_unauthorized`) and the
+    // `raw` channel is dropped from the confirmed subscription list.
+    // This example runs unauthenticated, so it uses a bucketed
+    // interval such as `100ms` or `agg2`. Authenticated callers may
+    // pass `"raw"` here instead.
     let trades_by_kind = SubscriptionChannel::TradesByKind {
         kind: "future".to_string(),
         currency: "BTC".to_string(),
-        interval: "raw".to_string(),
+        interval: "100ms".to_string(),
     };
     tracing::info!("Trades by kind channel: {}", trades_by_kind);
 
