@@ -127,6 +127,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("btc_scalping", 2.0, 1.0, 200, 1000),     // Scalping, very tight
     ];
 
+    // MMP configuration requires the feature to be activated on the
+    // account by Deribit staff. A 11050 `bad_request` with payload
+    // `"MMP disabled"` is the expected response on accounts without
+    // activation — log it and carry on so the rest of the demo still
+    // exercises its API surface without crashing.
     for (group_name, qty_limit, delta_limit, interval, frozen_time) in &mmp_groups {
         let config = MmpGroupConfig::new(
             group_name.to_string(),
@@ -136,8 +141,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             *frozen_time,
         )?;
 
-        client.set_mmp_config(config).await?;
-        tracing::info!("✅ MMP group '{}' configured", group_name);
+        match client.set_mmp_config(config).await {
+            Ok(()) => tracing::info!("✅ MMP group '{}' configured", group_name),
+            Err(e) => tracing::warn!(
+                "⚠️  MMP group '{}' config failed: {} — expected if MMP is not activated",
+                group_name,
+                e
+            ),
+        }
     }
 
     // Step 2: Create layered quotes across multiple groups
