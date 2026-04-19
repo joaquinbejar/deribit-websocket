@@ -1,7 +1,56 @@
-//! Prelude module for commonly used types and traits
+//! Curated glob-importable re-exports for common use cases.
 //!
-//! This module re-exports the most commonly used types from the deribit-websocket crate,
-//! making it easy to import everything needed with a single `use` statement.
+//! ```rust,no_run
+//! use deribit_websocket::prelude::*;
+//! ```
+//!
+//! Type names below are rendered as plain code rather than as rustdoc
+//! intra-doc links because this module doc is emitted before the
+//! re-exports it describes, so the linker would not resolve them.
+//!
+//! # What you get
+//!
+//! - **Client + config** — `DeribitWebSocketClient`, `WebSocketConfig`,
+//!   and the message-handler types (`MessageHandler`,
+//!   `MessageHandlerBuilder`, `MessageCallback`, `ErrorCallback`)
+//!   needed to drive a live connection.
+//! - **Session / connection** — `WebSocketSession` and
+//!   `WebSocketConnection` for consumers that want to hold the
+//!   underlying session directly.
+//! - **Error type** — `WebSocketError`. All fallible operations in this
+//!   crate return `Result<T, WebSocketError>`.
+//! - **DTOs commonly seen on the wire** — JSON-RPC envelopes
+//!   (`JsonRpcRequest`, `JsonRpcResponse`, `JsonRpcNotification`,
+//!   `JsonRpcError`, `JsonRpcResult`), trading structures
+//!   (`OrderRequest`, `OrderResponse`, `OrderInfo`, `TradeExecution`,
+//!   `Position`, etc.), mass-quote structures (`Quote`,
+//!   `MassQuoteRequest`, `MassQuoteResult`, `MmpGroupConfig`, …), and
+//!   account/subscription helpers.
+//! - **Message helpers** — `MessageBuilder`, `RequestBuilder`,
+//!   `ResponseHandler`, `NotificationHandler`.
+//! - **Constants** — everything from [`crate::constants`], including
+//!   default URLs and channel name prefixes.
+//! - **`setup_logger`** — quick `tracing` initialisation driven by
+//!   `DERIBIT_LOG_LEVEL`.
+//! - **A small slice of external types** — [`serde_json::Value`],
+//!   [`serde_json::json`], and
+//!   [`tokio_tungstenite::tungstenite::Message`] (re-exported as
+//!   `TungsteniteMessage`) because they appear in almost every
+//!   callback signature.
+//!
+//! # What you do *not* get
+//!
+//! The prelude is intentionally narrow. The following are **not**
+//! re-exported and should be imported by path when needed:
+//!
+//! - Less-common model variants — browse [`crate::model`] for the full
+//!   list (instrument metadata, chart candles, etc.).
+//! - Low-level dispatcher / connection internals — see
+//!   [`crate::connection`].
+//! - TLS backend helpers — see [`crate::tls`] and the crate-level
+//!   [`crate::install_default_crypto_provider`].
+//! - The `error` module sub-types beyond `WebSocketError` — see
+//!   [`crate::error`] for envelope builders and helpers.
 
 // Callback system
 pub use crate::callback::{ErrorCallback, MessageCallback, MessageHandler, MessageHandlerBuilder};

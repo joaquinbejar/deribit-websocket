@@ -39,8 +39,14 @@ jobs:
           sudo apt-get update && sudo apt-get install -y \
             make libfontconfig1-dev pkg-config build-essential libssl-dev
 
-      - name: Build (${{ matrix.tls }})
-        run: cargo build --no-default-features --features ${{ matrix.tls }}
+      # `--all-targets` = lib + bins + tests + examples + benches. This
+      # gives us CI coverage of every `examples/*.rs` under every TLS
+      # backend for free (per issue #54) instead of a dedicated
+      # single-backend "compile examples" step — if an example ever
+      # stops compiling, one of the six matrix cells fails.
+      - name: Build --all-targets (${{ matrix.tls }})
+        run: cargo build --all-targets --no-default-features --features ${{ matrix.tls
+          }}
 
   # Negative-case build: asserts the `compile_error!` mutex in
   # `src/tls.rs` rejects two TLS backends simultaneously. If the build
@@ -78,3 +84,27 @@ jobs:
             exit 1
           fi
           echo "mutex correctly rejected the double-backend build"
+
+  # Build rustdoc with warnings-as-errors (per issue #56). Catches dead
+  # intra-doc links, missing crate-level docs, and private-item leaks
+  # before they land on docs.rs. `--features integration-tests` is used
+  # instead of `--all-features` because the latter activates all three
+  # mutually-exclusive TLS backends at once and trips the compile_error!
+  # mutex — same reasoning as `make lint`.
+  rustdoc:
+    runs-on: ubuntu-latest
+    name: rustdoc (-D warnings)
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            make libfontconfig1-dev pkg-config build-essential
+
+      - name: cargo doc --features integration-tests
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --no-deps --features integration-tests

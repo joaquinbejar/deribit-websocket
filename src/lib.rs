@@ -266,6 +266,12 @@
 
 #![warn(missing_docs)]
 #![deny(unsafe_code)]
+// Catch dead rustdoc links and missing crate-level docs in CI via
+// `RUSTDOCFLAGS="-D warnings" cargo doc`. `missing_crate_level_docs`
+// is technically redundant with the substantial `//!` header above
+// but it guards against the header ever being deleted in a refactor.
+#![warn(rustdoc::broken_intra_doc_links)]
+#![warn(rustdoc::missing_crate_level_docs)]
 // Regression guard against future `std::sync::Mutex` use across `.await`.
 // Tokio's mutex (which this crate uses) is intentionally allowed.
 #![warn(clippy::await_holding_lock)]

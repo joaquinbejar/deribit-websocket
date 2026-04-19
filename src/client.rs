@@ -79,14 +79,22 @@ pub struct DeribitWebSocketClient {
 
 impl DeribitWebSocketClient {
     /// Create a new WebSocket client
+    ///
+    /// The caller's `&WebSocketConfig` is deep-copied once into an
+    /// `Arc<WebSocketConfig>` which is then shared with the inner
+    /// [`WebSocketSession`] via `Arc::clone` — no second struct clone,
+    /// no double allocation.
     pub fn new(config: &WebSocketConfig) -> Result<Self, WebSocketError> {
         let subscription_manager = Arc::new(Mutex::new(SubscriptionManager::new()));
+        // One unavoidable deep copy: we start from `&WebSocketConfig`
+        // and need an owned value to place inside the `Arc`. Every
+        // subsequent hand-off is a cheap `Arc::clone`.
+        let config = Arc::new(config.clone());
         let session = Arc::new(WebSocketSession::new(
-            config.clone(),
+            Arc::clone(&config),
             Arc::clone(&subscription_manager),
         ));
 
-        let config = Arc::new(config.clone());
         Ok(Self {
             config,
             dispatcher: Arc::new(Mutex::new(None)),
