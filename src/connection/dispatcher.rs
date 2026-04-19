@@ -410,6 +410,79 @@ mod tests {
         }
     }
 
+    /// Spawn a TCP listener that accepts one connection at the raw TCP
+    /// layer and then holds the socket without performing the WebSocket
+    /// upgrade. From the client's point of view the TCP connect
+    /// succeeds but the HTTP/WebSocket handshake never completes, which
+    /// is the stall mode `connection_timeout` must defend against.
+    ///
+    /// The returned [`JoinHandle`] owns the socket for the lifetime of
+    /// the test and should be aborted when the test is done.
+    async fn spawn_stalled_handshake_listener() -> (SocketAddr, JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind localhost ephemeral port");
+        let addr = listener
+            .local_addr()
+            .expect("read local addr of bound listener");
+        let handle = tokio::spawn(async move {
+            if let Ok((socket, _peer)) = listener.accept().await {
+                // Hold the socket well past any realistic test deadline.
+                // The test aborts this task before it ever wakes up.
+                tokio::time::sleep(Duration::from_secs(60)).await;
+                drop(socket);
+            }
+        });
+        (addr, handle)
+    }
+
+    /// Regression test for issue #50: if the peer accepts the TCP
+    /// connection but never completes the WebSocket upgrade, `connect`
+    /// must fail fast with `WebSocketError::Timeout` within the
+    /// configured `connection_timeout`.
+    #[tokio::test]
+    async fn test_connect_times_out_when_handshake_stalls() {
+        let (addr, server) = spawn_stalled_handshake_listener().await;
+        let url = ws_url(addr);
+
+        let start = std::time::Instant::now();
+        let result = Dispatcher::connect(
+            url,
+            Duration::from_millis(100),
+            Duration::from_secs(5),
+            16,
+            16,
+        )
+        .await;
+        let elapsed = start.elapsed();
+
+        assert!(
+            matches!(result, Err(WebSocketError::Timeout(_))),
+            "stalled handshake must surface WebSocketError::Timeout, got {:?}",
+            result
+        );
+        // 5x headroom over the 100ms deadline to tolerate CI scheduler jitter.
+        assert!(
+            elapsed < Duration::from_millis(500),
+            "connect must return within 500ms of a 100ms connection_timeout, took {:?}",
+            elapsed
+        );
+        if let Err(WebSocketError::Timeout(msg)) = result {
+            assert!(
+                msg.contains("handshake"),
+                "error message should mention the handshake, got: {}",
+                msg
+            );
+            assert!(
+                msg.contains("connection_timeout"),
+                "error message should name the config field, got: {}",
+                msg
+            );
+        }
+
+        server.abort();
+    }
+
     #[tokio::test]
     async fn test_dispatch_matches_single_request_response_by_id() {
         let (addr, server) = spawn_mock_server(|mut sink, mut stream| async move {
