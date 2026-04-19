@@ -13,7 +13,7 @@ fn make_subscription_manager() -> Arc<Mutex<SubscriptionManager>> {
 #[test]
 fn test_websocket_session_creation() {
     let config = WebSocketConfig::default();
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     // Test that session can be created
     let debug_str = format!("{:?}", session);
@@ -23,7 +23,7 @@ fn test_websocket_session_creation() {
 #[test]
 fn test_websocket_session_with_production_config() {
     let config = WebSocketConfig::default();
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     let debug_str = format!("{:?}", session);
     assert!(debug_str.contains("WebSocketSession"));
@@ -35,7 +35,7 @@ fn test_websocket_session_with_custom_config() {
         .with_heartbeat_interval(std::time::Duration::from_secs(60))
         .with_max_reconnect_attempts(10);
 
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     let debug_str = format!("{:?}", session);
     assert!(debug_str.contains("WebSocketSession"));
@@ -44,10 +44,7 @@ fn test_websocket_session_with_custom_config() {
 #[test]
 fn test_websocket_session_arc_compatibility() {
     let config = WebSocketConfig::default();
-    let session = Arc::new(WebSocketSession::new(
-        Arc::new(config),
-        make_subscription_manager(),
-    ));
+    let session = Arc::new(WebSocketSession::new(config, make_subscription_manager()));
 
     // Test that session can be wrapped in Arc (for thread safety)
     let session_clone = session.clone();
@@ -62,7 +59,7 @@ fn test_websocket_session_arc_compatibility() {
 #[test]
 fn test_websocket_session_debug_format() {
     let config = WebSocketConfig::default();
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     let debug_output = format!("{:?}", session);
     assert!(debug_output.contains("WebSocketSession"));
@@ -73,7 +70,7 @@ fn test_websocket_session_config_access() {
     let config =
         WebSocketConfig::default().with_heartbeat_interval(std::time::Duration::from_secs(45));
 
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     // Test that config can be accessed
     let config_ref = session.config();
@@ -83,7 +80,7 @@ fn test_websocket_session_config_access() {
 #[test]
 fn test_websocket_session_subscription_manager() {
     let config = WebSocketConfig::default();
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     // Test that subscription manager can be accessed
     let manager = session.subscription_manager();
@@ -93,7 +90,7 @@ fn test_websocket_session_subscription_manager() {
 #[tokio::test]
 async fn test_websocket_session_state() {
     let config = WebSocketConfig::default();
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     // Initial state should be Disconnected
     let state = session.state().await;
@@ -105,7 +102,7 @@ async fn test_websocket_session_set_state() {
     use deribit_websocket::model::ConnectionState;
 
     let config = WebSocketConfig::default();
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     // Set state to Connected
     session.set_state(ConnectionState::Connected).await;
@@ -116,7 +113,7 @@ async fn test_websocket_session_set_state() {
 #[tokio::test]
 async fn test_websocket_session_is_connected_false() {
     let config = WebSocketConfig::default();
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     // Initial state is Disconnected, so is_connected should be false
     assert!(!session.is_connected().await);
@@ -127,7 +124,7 @@ async fn test_websocket_session_is_connected_true() {
     use deribit_websocket::model::ConnectionState;
 
     let config = WebSocketConfig::default();
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     session.set_state(ConnectionState::Connected).await;
     assert!(session.is_connected().await);
@@ -136,7 +133,7 @@ async fn test_websocket_session_is_connected_true() {
 #[tokio::test]
 async fn test_websocket_session_is_authenticated_false() {
     let config = WebSocketConfig::default();
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     assert!(!session.is_authenticated().await);
 }
@@ -146,7 +143,7 @@ async fn test_websocket_session_is_authenticated_true() {
     use deribit_websocket::model::ConnectionState;
 
     let config = WebSocketConfig::default();
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     session.set_state(ConnectionState::Authenticated).await;
     assert!(session.is_authenticated().await);
@@ -155,7 +152,7 @@ async fn test_websocket_session_is_authenticated_true() {
 #[tokio::test]
 async fn test_websocket_session_mark_authenticated() {
     let config = WebSocketConfig::default();
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     session.mark_authenticated().await;
     assert!(session.is_authenticated().await);
@@ -166,7 +163,7 @@ async fn test_websocket_session_mark_disconnected() {
     use deribit_websocket::model::ConnectionState;
 
     let config = WebSocketConfig::default();
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     // First connect and authenticate
     session.set_state(ConnectionState::Authenticated).await;
@@ -181,7 +178,7 @@ async fn test_websocket_session_mark_disconnected() {
 #[tokio::test]
 async fn test_websocket_session_reactivate_subscriptions() {
     let config = WebSocketConfig::default();
-    let session = WebSocketSession::new(Arc::new(config), make_subscription_manager());
+    let session = WebSocketSession::new(config, make_subscription_manager());
 
     // This should not panic
     session.reactivate_subscriptions().await;

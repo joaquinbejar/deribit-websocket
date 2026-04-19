@@ -17,17 +17,20 @@ pub struct WebSocketSession {
 impl WebSocketSession {
     /// Create a new WebSocket session.
     ///
-    /// Takes the configuration as an `Arc<WebSocketConfig>` so it can be
-    /// shared with [`crate::client::DeribitWebSocketClient`] (which
-    /// stores the same `Arc`) without deep-copying the config struct.
-    /// Callers that start from an owned `WebSocketConfig` should wrap
-    /// it once via `Arc::new(config)` before calling.
+    /// Accepts anything convertible into `Arc<WebSocketConfig>`, which
+    /// via Rust's blanket `impl<T> From<T> for Arc<T>` covers both an
+    /// owned `WebSocketConfig` (wrapped once here) and an existing
+    /// `Arc<WebSocketConfig>` shared with
+    /// [`crate::client::DeribitWebSocketClient`] (zero extra copies).
+    /// This keeps the constructor backward-compatible with pre-existing
+    /// owned-value call sites while also giving the client a zero-copy
+    /// path for its shared configuration.
     pub fn new(
-        config: Arc<WebSocketConfig>,
+        config: impl Into<Arc<WebSocketConfig>>,
         subscription_manager: Arc<Mutex<SubscriptionManager>>,
     ) -> Self {
         Self {
-            config,
+            config: config.into(),
             state: Arc::new(Mutex::new(ConnectionState::Disconnected)),
             subscription_manager,
         }
