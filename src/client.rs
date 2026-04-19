@@ -17,8 +17,11 @@
 //!    [`WebSocketConfig::notification_channel_capacity`] (default 1024).
 //!    When full, the dispatcher task blocks on `send().await`, stops
 //!    polling the WebSocket stream, and the TCP recv buffer fills →
-//!    the Deribit server applies flow control. Every full-channel event
-//!    emits a `tracing::warn!` so slow consumers are visible in logs.
+//!    the Deribit server applies flow control. No frames are dropped
+//!    due to backpressure; if the receiver has been closed (for
+//!    example during shutdown or disconnect), the affected frames are
+//!    discarded. Every full-channel event emits a `tracing::warn!` so
+//!    slow consumers are visible in logs.
 //! 2. **Command channel** (client → dispatcher). Carries outbound
 //!    commands — request sends, cancel-request on timeout, shutdown —
 //!    from every client method to the dispatcher. Depth is

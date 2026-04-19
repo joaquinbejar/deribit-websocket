@@ -97,8 +97,10 @@ impl Dispatcher {
     ///   falls behind, the dispatcher task blocks on the channel send,
     ///   which stops it polling the WebSocket stream, which fills the
     ///   TCP recv buffer, which makes the server throttle. No frames are
-    ///   dropped. Every full-channel event emits a `tracing::warn!` so
-    ///   slow consumers are visible in logs.
+    ///   dropped due to backpressure; if the notification receiver has
+    ///   been closed (for example after shutdown or disconnect), the
+    ///   affected frames are discarded. Every full-channel event emits
+    ///   a `tracing::warn!` so slow consumers are visible in logs.
     /// - `cmd_capacity` — depth of the outbound command channel. Same
     ///   Strategy A (await-send) applies: callers of `send_request` /
     ///   `shutdown` block when the dispatcher has not drained prior
@@ -326,7 +328,10 @@ async fn run_dispatcher(
                         // emit a `tracing::warn!` and then block on
                         // `send().await` so the slow consumer applies
                         // backpressure to the dispatcher → TCP buffer →
-                        // server. No frames are ever dropped.
+                        // server. No frames are dropped due to
+                        // backpressure; the only drop path is the
+                        // `Closed` branch below, reached after the
+                        // receiver has been dropped.
                         match notif_tx.try_send(text) {
                             Ok(()) => {}
                             Err(mpsc::error::TrySendError::Full(text)) => {
@@ -1119,10 +1124,9 @@ mod tests {
     /// (buffered, awaiting, or on the wire), drains the receiver, and
     /// asserts every frame arrives exactly once and in order.
     ///
-    /// Guards against: silent frame drops, channel reordering under
-    /// backpressure, and accidental regression to `unbounded_channel`
-    /// (under which this test would still pass but the bound is
-    /// meaningless).
+    /// Guards against: silent frame drops under backpressure and
+    /// channel reordering when the producer has to await on a full
+    /// channel between frames.
     #[tokio::test]
     async fn test_notification_channel_is_bounded_and_preserves_order() {
         const FRAME_COUNT: u64 = 4;

@@ -198,7 +198,10 @@
 //!
 //! The client and dispatcher communicate over two **bounded**
 //! `tokio::sync::mpsc` channels, both using **Strategy A (await-send)** —
-//! the producer blocks on a full channel, no frame is ever dropped.
+//! the producer blocks on a full channel, so frames are not dropped due
+//! to backpressure. Frames can still be discarded if the notification
+//! receiver has already been closed (for example during shutdown or
+//! disconnect).
 //!
 //! - **`notification_channel_capacity`** (default 1024) — notifications
 //!   from the dispatcher to the consumer. When full, the dispatcher

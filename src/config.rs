@@ -47,9 +47,11 @@ pub struct WebSocketConfig {
     /// When the channel is full the dispatcher task blocks on
     /// `send().await`; it therefore stops polling the WebSocket stream,
     /// the TCP recv buffer fills, and the Deribit server applies flow
-    /// control. **No frames are ever dropped.** Every full-channel event
-    /// emits a `tracing::warn!` with the channel capacity so slow
-    /// consumers are visible in logs.
+    /// control. **No frames are dropped due to backpressure; if the
+    /// notification receiver has been closed (for example during
+    /// shutdown or disconnect), the affected frames are discarded.**
+    /// Every full-channel event emits a `tracing::warn!` with the
+    /// channel capacity so slow consumers are visible in logs.
     ///
     /// Sizing: the default of `1024` is sufficient for normal liquid
     /// instruments. Raise it when the consumer performs heavy synchronous
