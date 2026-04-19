@@ -197,8 +197,8 @@ impl DeribitWebSocketClient {
             builder.build_auth_request(client_id, client_secret)
         };
 
-        let request_ctx = request.clone();
-        let response = self.send_request(request).await?;
+        let request_ctx: &JsonRpcRequest = &request;
+        let response = self.send_request(&request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -210,7 +210,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -248,7 +248,7 @@ impl DeribitWebSocketClient {
             builder.build_subscribe_request(channels)
         };
 
-        let response = self.send_request(request).await?;
+        let response = self.send_request(&request).await?;
 
         // Parse + validate the confirmed list outside the subscription
         // mutex. Only acquire the lock once we have work to do.
@@ -287,7 +287,7 @@ impl DeribitWebSocketClient {
             builder.build_unsubscribe_request(channels)
         };
 
-        let response = self.send_request(request).await?;
+        let response = self.send_request(&request).await?;
 
         // Parse + validate the confirmed list outside the subscription
         // mutex. Only acquire the lock once we have work to do.
@@ -317,8 +317,8 @@ impl DeribitWebSocketClient {
             builder.build_public_unsubscribe_all_request()
         };
 
-        let request_ctx = request.clone();
-        let response = self.send_request(request).await?;
+        let request_ctx: &JsonRpcRequest = &request;
+        let response = self.send_request(&request).await?;
 
         // Clear the local subscription manager only after the server
         // confirms success. On API error (e.g. not authenticated) we
@@ -336,7 +336,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -362,8 +362,8 @@ impl DeribitWebSocketClient {
             builder.build_private_unsubscribe_all_request()
         };
 
-        let request_ctx = request.clone();
-        let response = self.send_request(request).await?;
+        let request_ctx: &JsonRpcRequest = &request;
+        let response = self.send_request(&request).await?;
 
         // Clear the local subscription manager only after the server
         // confirms success. On API error we preserve the local view so
@@ -380,7 +380,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -395,9 +395,14 @@ impl DeribitWebSocketClient {
     /// matching on the JSON-RPC `id` field. Notifications arriving
     /// between the request and the response do not affect this call and
     /// are routed to the notification channel instead.
+    ///
+    /// `request` is borrowed: callers retain ownership so they can
+    /// inspect the originating request after the call (for example to
+    /// build an enriched [`WebSocketError::ApiError`]) without paying
+    /// for a clone on the success path.
     pub async fn send_request(
         &self,
-        request: JsonRpcRequest,
+        request: &JsonRpcRequest,
     ) -> Result<JsonRpcResponse, WebSocketError> {
         // Clone the Arc<Dispatcher> out under the short-lived slot lock,
         // then drop the guard before awaiting on the dispatcher. This
@@ -455,8 +460,8 @@ impl DeribitWebSocketClient {
             builder.build_test_request()
         };
 
-        let request_ctx = request.clone();
-        let response = self.send_request(request).await?;
+        let request_ctx: &JsonRpcRequest = &request;
+        let response = self.send_request(&request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -465,7 +470,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -490,8 +495,8 @@ impl DeribitWebSocketClient {
             builder.build_get_time_request()
         };
 
-        let request_ctx = request.clone();
-        let response = self.send_request(request).await?;
+        let request_ctx: &JsonRpcRequest = &request;
+        let response = self.send_request(&request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => result.as_u64().ok_or_else(|| {
@@ -502,7 +507,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -533,8 +538,8 @@ impl DeribitWebSocketClient {
             builder.build_set_heartbeat_request(interval)
         };
 
-        let request_ctx = request.clone();
-        let response = self.send_request(request).await?;
+        let request_ctx: &JsonRpcRequest = &request;
+        let response = self.send_request(&request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => {
@@ -547,7 +552,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -572,8 +577,8 @@ impl DeribitWebSocketClient {
             builder.build_disable_heartbeat_request()
         };
 
-        let request_ctx = request.clone();
-        let response = self.send_request(request).await?;
+        let request_ctx: &JsonRpcRequest = &request;
+        let response = self.send_request(&request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => {
@@ -586,7 +591,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -621,8 +626,8 @@ impl DeribitWebSocketClient {
             builder.build_hello_request(client_name, client_version)
         };
 
-        let request_ctx = request.clone();
-        let response = self.send_request(request).await?;
+        let request_ctx: &JsonRpcRequest = &request;
+        let response = self.send_request(&request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -631,7 +636,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -658,8 +663,8 @@ impl DeribitWebSocketClient {
             builder.build_enable_cancel_on_disconnect_request()
         };
 
-        let request_ctx = request.clone();
-        let response = self.send_request(request).await?;
+        let request_ctx: &JsonRpcRequest = &request;
+        let response = self.send_request(&request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => {
@@ -672,7 +677,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -698,8 +703,8 @@ impl DeribitWebSocketClient {
             builder.build_disable_cancel_on_disconnect_request()
         };
 
-        let request_ctx = request.clone();
-        let response = self.send_request(request).await?;
+        let request_ctx: &JsonRpcRequest = &request;
+        let response = self.send_request(&request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => {
@@ -712,7 +717,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -737,8 +742,8 @@ impl DeribitWebSocketClient {
             builder.build_get_cancel_on_disconnect_request()
         };
 
-        let request_ctx = request.clone();
-        let response = self.send_request(request).await?;
+        let request_ctx: &JsonRpcRequest = &request;
+        let response = self.send_request(&request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => {
@@ -756,7 +761,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -777,8 +782,8 @@ impl DeribitWebSocketClient {
             builder.build_mass_quote_request(request)?
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         // Parse the response using WsResponse structure
         match response.result {
@@ -791,7 +796,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -809,8 +814,8 @@ impl DeribitWebSocketClient {
             builder.build_cancel_quotes_request(request)?
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         // Parse the response using JsonRpcResult structure
         match response.result {
@@ -823,7 +828,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -838,15 +843,15 @@ impl DeribitWebSocketClient {
             builder.build_set_mmp_config_request(config)?
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { .. } => Ok(()),
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -864,8 +869,8 @@ impl DeribitWebSocketClient {
             builder.build_get_mmp_config_request(mmp_group)
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -877,7 +882,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -892,15 +897,15 @@ impl DeribitWebSocketClient {
             builder.build_reset_mmp_request(mmp_group)
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { .. } => Ok(()),
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -920,8 +925,8 @@ impl DeribitWebSocketClient {
             builder.build_get_open_orders_request(currency, kind, type_filter)
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -933,7 +938,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -959,8 +964,8 @@ impl DeribitWebSocketClient {
             builder.build_buy_request(&request)?
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -969,7 +974,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -995,8 +1000,8 @@ impl DeribitWebSocketClient {
             builder.build_sell_request(&request)?
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -1005,7 +1010,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -1031,8 +1036,8 @@ impl DeribitWebSocketClient {
             builder.build_cancel_request(order_id)
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -1041,7 +1046,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -1060,8 +1065,8 @@ impl DeribitWebSocketClient {
             builder.build_cancel_all_request()
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -1073,7 +1078,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -1096,8 +1101,8 @@ impl DeribitWebSocketClient {
             builder.build_cancel_all_by_currency_request(currency)
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -1109,7 +1114,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -1135,8 +1140,8 @@ impl DeribitWebSocketClient {
             builder.build_cancel_all_by_instrument_request(instrument_name)
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -1148,7 +1153,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -1174,8 +1179,8 @@ impl DeribitWebSocketClient {
             builder.build_edit_request(&request)?
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -1184,7 +1189,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -1220,8 +1225,8 @@ impl DeribitWebSocketClient {
             builder.build_get_positions_request(currency, kind)
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -1230,7 +1235,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -1264,8 +1269,8 @@ impl DeribitWebSocketClient {
             builder.build_get_account_summary_request(currency, extended)
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -1277,7 +1282,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -1309,8 +1314,8 @@ impl DeribitWebSocketClient {
             builder.build_get_order_state_request(order_id)
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -1322,7 +1327,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -1358,8 +1363,8 @@ impl DeribitWebSocketClient {
             builder.build_get_order_history_by_currency_request(currency, kind, count)
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -1371,7 +1376,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -1409,8 +1414,8 @@ impl DeribitWebSocketClient {
             builder.build_close_position_request(instrument_name, order_type, price)?
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -1422,7 +1427,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))
@@ -1460,8 +1465,8 @@ impl DeribitWebSocketClient {
             builder.build_move_positions_request(currency, source_uid, target_uid, trades)?
         };
 
-        let request_ctx = json_request.clone();
-        let response = self.send_request(json_request).await?;
+        let request_ctx: &JsonRpcRequest = &json_request;
+        let response = self.send_request(&json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { result } => serde_json::from_value(result).map_err(|e| {
@@ -1473,7 +1478,7 @@ impl DeribitWebSocketClient {
             JsonRpcResult::Error { error } => {
                 let raw = build_raw_error_response(&response.jsonrpc, &response.id, &error);
                 Err(WebSocketError::api_error_from_parts(
-                    &request_ctx,
+                    request_ctx,
                     error,
                     Some(raw),
                 ))

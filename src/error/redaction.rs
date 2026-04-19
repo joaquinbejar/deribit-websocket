@@ -97,8 +97,7 @@ pub(crate) fn redact_raw_response(raw: &str) -> String {
 pub(crate) fn truncate_for_display(s: &str) -> Cow<'_, str> {
     match s.char_indices().nth(MAX_PAYLOAD_DISPLAY_LEN) {
         Some((byte_idx, _)) => {
-            let mut truncated =
-                String::with_capacity(byte_idx.saturating_add('…'.len_utf8()));
+            let mut truncated = String::with_capacity(byte_idx.saturating_add('…'.len_utf8()));
             truncated.push_str(&s[..byte_idx]);
             truncated.push('…');
             Cow::Owned(truncated)

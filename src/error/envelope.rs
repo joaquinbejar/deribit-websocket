@@ -1,7 +1,7 @@
 //! Reconstruction of the raw JSON-RPC error envelope.
 //!
 //! When the server returns a JSON-RPC error, the client only retains
-//! the parsed [`JsonRpcResponse`] (with `result` already destructured).
+//! the parsed `JsonRpcResponse` (with `result` already destructured).
 //! This module reassembles a wire-equivalent `{jsonrpc, id, error}`
 //! payload from the still-accessible response fields so the enriched
 //! [`super::WebSocketError::ApiError`] can carry the full context for
@@ -22,11 +22,7 @@ use crate::model::ws_types::JsonRpcError;
 /// `Value` serialises), so this function returns `String` directly.
 #[must_use]
 #[inline]
-pub(crate) fn build_raw_error_response(
-    jsonrpc: &str,
-    id: &Value,
-    error: &JsonRpcError,
-) -> String {
+pub(crate) fn build_raw_error_response(jsonrpc: &str, id: &Value, error: &JsonRpcError) -> String {
     serde_json::json!({
         "jsonrpc": jsonrpc,
         "id": id,
