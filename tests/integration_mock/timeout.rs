@@ -27,9 +27,14 @@ const TIMEOUT_OBSERVATION_BOUND: Duration = Duration::from_millis(750);
 #[tokio::test]
 async fn request_timeout_fires_on_silent_server() {
     let server = spawn_mock_server(|_sink, mut stream| async move {
-        // Read the request and deliberately never reply.
+        // Read the request and deliberately never reply. Then drain the
+        // stream until the client closes the socket so the server-side
+        // socket stays alive long enough for the client's request
+        // timeout to fire (rather than racing against a fixed sleep),
+        // and the scenario — and therefore `server.finish()` — returns
+        // promptly once the client is done.
         let _ = stream.next().await;
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        while stream.next().await.is_some() {}
     })
     .await;
 
@@ -60,4 +65,6 @@ async fn request_timeout_fires_on_silent_server() {
     })
     .await
     .expect("timeout flow finishes within 5s");
+
+    server.finish().await;
 }

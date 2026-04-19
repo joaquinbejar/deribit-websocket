@@ -126,4 +126,9 @@ async fn manual_reconnect_replays_subscription() {
         "both observed frames must be public/subscribe, got {:?}",
         methods
     );
+    // Release the guard before awaiting the server task to avoid holding
+    // the mutex across the await point.
+    drop(methods);
+
+    server.finish().await;
 }

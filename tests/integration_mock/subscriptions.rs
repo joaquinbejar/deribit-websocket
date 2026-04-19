@@ -84,4 +84,6 @@ async fn subscribe_and_unsubscribe_update_manager() {
     })
     .await
     .expect("subscribe flow finishes within 5s");
+
+    server.finish().await;
 }

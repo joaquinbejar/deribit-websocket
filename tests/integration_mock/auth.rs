@@ -56,4 +56,7 @@ async fn authenticate_round_trip_against_mock() {
     })
     .await
     .expect("auth flow finishes within 5s");
+
+    // Surface any panic from the server scenario closure.
+    server.finish().await;
 }

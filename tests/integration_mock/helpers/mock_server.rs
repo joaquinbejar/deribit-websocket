@@ -27,14 +27,21 @@ pub(crate) type ScenarioStream = SplitStream<WebSocketStream<tokio::net::TcpStre
 
 /// Handle to a running mock server.
 ///
-/// The background task is aborted on `Drop`, so tests that create a
-/// [`MockServer`] must keep it alive for the duration of the assertions
-/// they care about. The [`MockServer::ws_url`] helper returns the
+/// Tests should call [`MockServer::finish`] once the client side is
+/// done so a server-side panic (for example, an assertion failure
+/// inside a scenario closure) is surfaced as a test failure rather
+/// than silently swallowed by `tokio::spawn`. The background task is
+/// still aborted on `Drop` as a safety net for tests that exit early
+/// via `?` or panic before reaching the `finish` call.
+///
+/// The [`MockServer::ws_url`] helper returns the
 /// `ws://127.0.0.1:<port>/` URL the client should dial.
 pub(crate) struct MockServer {
     /// Address the listener is bound to.
     pub(crate) addr: SocketAddr,
-    handle: JoinHandle<()>,
+    /// Wrapped in `Option` so [`finish`] can take ownership of the
+    /// handle without racing the `Drop` abort fallback.
+    handle: Option<JoinHandle<()>>,
 }
 
 impl MockServer {
@@ -42,11 +49,35 @@ impl MockServer {
     pub(crate) fn ws_url(&self) -> String {
         format!("ws://{}/", self.addr)
     }
+
+    /// Await the server task and propagate any panic from a scenario
+    /// closure into the calling test.
+    ///
+    /// Panics raised inside `tokio::spawn` are only observable when the
+    /// corresponding [`JoinHandle`] is awaited; without this call a
+    /// server-side `assert!`/`expect` failure would be silently
+    /// dropped and the client-side assertions could pass, masking a
+    /// real bug in the mock scenario or in the code under test.
+    ///
+    /// Cancellation (the `Drop` abort fallback) is treated as a no-op
+    /// so tests that exit early still shut down cleanly.
+    pub(crate) async fn finish(mut self) {
+        if let Some(handle) = self.handle.take() {
+            match handle.await {
+                Ok(()) => {}
+                Err(err) if err.is_cancelled() => {}
+                Err(err) if err.is_panic() => std::panic::resume_unwind(err.into_panic()),
+                Err(err) => panic!("mock server task failed: {err:?}"),
+            }
+        }
+    }
 }
 
 impl Drop for MockServer {
     fn drop(&mut self) {
-        self.handle.abort();
+        if let Some(handle) = self.handle.take() {
+            handle.abort();
+        }
     }
 }
 
@@ -81,7 +112,10 @@ where
         let (sink, stream) = ws.split();
         scenario(sink, stream).await;
     });
-    MockServer { addr, handle }
+    MockServer {
+        addr,
+        handle: Some(handle),
+    }
 }
 
 /// Spawn a local WebSocket server that accepts exactly two connections
@@ -129,5 +163,8 @@ where
         let (sink, stream) = ws.split();
         second(sink, stream).await;
     });
-    MockServer { addr, handle }
+    MockServer {
+        addr,
+        handle: Some(handle),
+    }
 }

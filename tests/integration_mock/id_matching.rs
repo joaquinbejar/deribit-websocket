@@ -90,4 +90,6 @@ async fn concurrent_requests_match_responses_by_id() {
     })
     .await
     .expect("id-matching flow finishes within 5s");
+
+    server.finish().await;
 }

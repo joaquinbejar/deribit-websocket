@@ -65,4 +65,6 @@ async fn server_push_reaches_receive_message() {
     })
     .await
     .expect("notification flow finishes within 5s");
+
+    server.finish().await;
 }
