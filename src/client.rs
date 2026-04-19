@@ -197,6 +197,7 @@ impl DeribitWebSocketClient {
             builder.build_auth_request(client_id, client_secret)
         };
 
+        let request_ctx = request.clone();
         let response = self.send_request(request).await?;
 
         match response.result {
@@ -207,7 +208,17 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -311,6 +322,7 @@ impl DeribitWebSocketClient {
             builder.build_public_unsubscribe_all_request()
         };
 
+        let request_ctx = request.clone();
         let response = self.send_request(request).await?;
 
         // Clear the local subscription manager only after the server
@@ -327,7 +339,17 @@ impl DeribitWebSocketClient {
                 })
             }
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -350,6 +372,7 @@ impl DeribitWebSocketClient {
             builder.build_private_unsubscribe_all_request()
         };
 
+        let request_ctx = request.clone();
         let response = self.send_request(request).await?;
 
         // Clear the local subscription manager only after the server
@@ -365,7 +388,17 @@ impl DeribitWebSocketClient {
                 })
             }
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -437,6 +470,7 @@ impl DeribitWebSocketClient {
             builder.build_test_request()
         };
 
+        let request_ctx = request.clone();
         let response = self.send_request(request).await?;
 
         match response.result {
@@ -444,7 +478,17 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse test response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -466,6 +510,7 @@ impl DeribitWebSocketClient {
             builder.build_get_time_request()
         };
 
+        let request_ctx = request.clone();
         let response = self.send_request(request).await?;
 
         match response.result {
@@ -475,7 +520,17 @@ impl DeribitWebSocketClient {
                 )
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -503,6 +558,7 @@ impl DeribitWebSocketClient {
             builder.build_set_heartbeat_request(interval)
         };
 
+        let request_ctx = request.clone();
         let response = self.send_request(request).await?;
 
         match response.result {
@@ -514,7 +570,17 @@ impl DeribitWebSocketClient {
                 })
             }
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -536,6 +602,7 @@ impl DeribitWebSocketClient {
             builder.build_disable_heartbeat_request()
         };
 
+        let request_ctx = request.clone();
         let response = self.send_request(request).await?;
 
         match response.result {
@@ -547,7 +614,17 @@ impl DeribitWebSocketClient {
                 })
             }
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -579,6 +656,7 @@ impl DeribitWebSocketClient {
             builder.build_hello_request(client_name, client_version)
         };
 
+        let request_ctx = request.clone();
         let response = self.send_request(request).await?;
 
         match response.result {
@@ -586,7 +664,17 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse hello response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -610,6 +698,7 @@ impl DeribitWebSocketClient {
             builder.build_enable_cancel_on_disconnect_request()
         };
 
+        let request_ctx = request.clone();
         let response = self.send_request(request).await?;
 
         match response.result {
@@ -621,7 +710,17 @@ impl DeribitWebSocketClient {
                 })
             }
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -644,6 +743,7 @@ impl DeribitWebSocketClient {
             builder.build_disable_cancel_on_disconnect_request()
         };
 
+        let request_ctx = request.clone();
         let response = self.send_request(request).await?;
 
         match response.result {
@@ -655,7 +755,17 @@ impl DeribitWebSocketClient {
                 })
             }
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -677,6 +787,7 @@ impl DeribitWebSocketClient {
             builder.build_get_cancel_on_disconnect_request()
         };
 
+        let request_ctx = request.clone();
         let response = self.send_request(request).await?;
 
         match response.result {
@@ -693,7 +804,17 @@ impl DeribitWebSocketClient {
                     })
             }
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -711,6 +832,7 @@ impl DeribitWebSocketClient {
             builder.build_mass_quote_request(request)?
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         // Parse the response using WsResponse structure
@@ -722,7 +844,17 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -737,6 +869,7 @@ impl DeribitWebSocketClient {
             builder.build_cancel_quotes_request(request)?
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         // Parse the response using JsonRpcResult structure
@@ -748,7 +881,17 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -760,12 +903,23 @@ impl DeribitWebSocketClient {
             builder.build_set_mmp_config_request(config)?
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { .. } => Ok(()),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -780,6 +934,7 @@ impl DeribitWebSocketClient {
             builder.build_get_mmp_config_request(mmp_group)
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -790,7 +945,17 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -802,12 +967,23 @@ impl DeribitWebSocketClient {
             builder.build_reset_mmp_request(mmp_group)
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
             JsonRpcResult::Success { .. } => Ok(()),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -824,6 +1000,7 @@ impl DeribitWebSocketClient {
             builder.build_get_open_orders_request(currency, kind, type_filter)
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -834,7 +1011,17 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -857,6 +1044,7 @@ impl DeribitWebSocketClient {
             builder.build_buy_request(&request)?
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -864,7 +1052,17 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse buy response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -887,6 +1085,7 @@ impl DeribitWebSocketClient {
             builder.build_sell_request(&request)?
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -894,7 +1093,17 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse sell response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -917,6 +1126,7 @@ impl DeribitWebSocketClient {
             builder.build_cancel_request(order_id)
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -924,7 +1134,17 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse cancel response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -940,6 +1160,7 @@ impl DeribitWebSocketClient {
             builder.build_cancel_all_request()
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -950,7 +1171,17 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -970,6 +1201,7 @@ impl DeribitWebSocketClient {
             builder.build_cancel_all_by_currency_request(currency)
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -980,7 +1212,17 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -1003,6 +1245,7 @@ impl DeribitWebSocketClient {
             builder.build_cancel_all_by_instrument_request(instrument_name)
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -1013,7 +1256,17 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -1036,6 +1289,7 @@ impl DeribitWebSocketClient {
             builder.build_edit_request(&request)?
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -1043,7 +1297,17 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse edit response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -1076,6 +1340,7 @@ impl DeribitWebSocketClient {
             builder.build_get_positions_request(currency, kind)
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -1083,7 +1348,17 @@ impl DeribitWebSocketClient {
                 WebSocketError::InvalidMessage(format!("Failed to parse positions response: {}", e))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -1114,6 +1389,7 @@ impl DeribitWebSocketClient {
             builder.build_get_account_summary_request(currency, extended)
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -1124,7 +1400,17 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -1153,6 +1439,7 @@ impl DeribitWebSocketClient {
             builder.build_get_order_state_request(order_id)
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -1163,7 +1450,17 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -1196,6 +1493,7 @@ impl DeribitWebSocketClient {
             builder.build_get_order_history_by_currency_request(currency, kind, count)
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -1206,7 +1504,17 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -1241,6 +1549,7 @@ impl DeribitWebSocketClient {
             builder.build_close_position_request(instrument_name, order_type, price)?
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -1251,7 +1560,17 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
@@ -1286,6 +1605,7 @@ impl DeribitWebSocketClient {
             builder.build_move_positions_request(currency, source_uid, target_uid, trades)?
         };
 
+        let request_ctx = json_request.clone();
         let response = self.send_request(json_request).await?;
 
         match response.result {
@@ -1296,7 +1616,17 @@ impl DeribitWebSocketClient {
                 ))
             }),
             JsonRpcResult::Error { error } => {
-                Err(WebSocketError::ApiError(error.code, error.message))
+                let raw = serde_json::json!({
+                    "jsonrpc": &response.jsonrpc,
+                    "id": &response.id,
+                    "error": &error,
+                })
+                .to_string();
+                Err(WebSocketError::api_error_from_parts(
+                    &request_ctx,
+                    error,
+                    Some(raw),
+                ))
             }
         }
     }
