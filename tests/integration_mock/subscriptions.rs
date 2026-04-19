@@ -20,24 +20,49 @@ const CHANNEL: &str = "ticker.BTC-PERPETUAL.raw";
 #[tokio::test]
 async fn subscribe_and_unsubscribe_update_manager() {
     let server = spawn_mock_server(|mut sink, mut stream| async move {
-        // Accept two requests: subscribe first, then unsubscribe. Both
-        // echo the single channel back as a success result.
-        for _ in 0..2 {
-            let text = match stream.next().await {
-                Some(Ok(Message::Text(t))) => t,
-                _ => return,
-            };
-            let request: Value = serde_json::from_str(&text).expect("request parses as JSON");
-            let id = request.get("id").cloned().unwrap_or(Value::Null);
-            let method = request["method"].as_str().unwrap_or("");
-            let reply = if method.ends_with("/subscribe") {
-                subscribe_success(&id, &[CHANNEL])
-            } else {
-                unsubscribe_success(&id, &[CHANNEL])
-            };
-            let _ = sink.send(Message::Text(reply.into())).await;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
+        // Accept the subscribe first, assert its method is literally
+        // `public/subscribe`, then echo the channel list.
+        let subscribe_text = match stream.next().await {
+            Some(Ok(Message::Text(t))) => t,
+            _ => return,
+        };
+        let subscribe_request: Value =
+            serde_json::from_str(&subscribe_text).expect("subscribe request parses as JSON");
+        let subscribe_id = subscribe_request.get("id").cloned().unwrap_or(Value::Null);
+        assert_eq!(
+            subscribe_request["method"].as_str().unwrap_or(""),
+            "public/subscribe",
+            "first request must be public/subscribe, got {}",
+            subscribe_request["method"]
+        );
+        let _ = sink
+            .send(Message::Text(
+                subscribe_success(&subscribe_id, &[CHANNEL]).into(),
+            ))
+            .await;
+
+        // Then the unsubscribe, same assertion pattern.
+        let unsubscribe_text = match stream.next().await {
+            Some(Ok(Message::Text(t))) => t,
+            _ => return,
+        };
+        let unsubscribe_request: Value =
+            serde_json::from_str(&unsubscribe_text).expect("unsubscribe request parses as JSON");
+        let unsubscribe_id = unsubscribe_request
+            .get("id")
+            .cloned()
+            .unwrap_or(Value::Null);
+        assert_eq!(
+            unsubscribe_request["method"].as_str().unwrap_or(""),
+            "public/unsubscribe",
+            "second request must be public/unsubscribe, got {}",
+            unsubscribe_request["method"]
+        );
+        let _ = sink
+            .send(Message::Text(
+                unsubscribe_success(&unsubscribe_id, &[CHANNEL]).into(),
+            ))
+            .await;
     })
     .await;
 
