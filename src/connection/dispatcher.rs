@@ -93,8 +93,18 @@ impl Dispatcher {
     ///   never completed the upgrade.
     /// - `request_timeout` — upper bound for each `send_request` call.
     /// - `notification_capacity` — depth of the bounded notifications
-    ///   channel. Slow consumers apply back-pressure on the dispatcher.
-    /// - `cmd_capacity` — depth of the outbound command channel.
+    ///   channel. Strategy A (await-send) backpressure: if the consumer
+    ///   falls behind, the dispatcher task blocks on the channel send,
+    ///   which stops it polling the WebSocket stream, which fills the
+    ///   TCP recv buffer, which makes the server throttle. No frames are
+    ///   dropped due to backpressure; if the notification receiver has
+    ///   been closed (for example after shutdown or disconnect), the
+    ///   affected frames are discarded. Every full-channel event emits
+    ///   a `tracing::warn!` so slow consumers are visible in logs.
+    /// - `cmd_capacity` — depth of the outbound command channel. Same
+    ///   Strategy A (await-send) applies: callers of `send_request` /
+    ///   `shutdown` block when the dispatcher has not drained prior
+    ///   commands yet.
     ///
     /// # Errors
     ///
@@ -311,9 +321,35 @@ async fn run_dispatcher(
                             let _ = responder.send(resp_res);
                             continue;
                         }
-                        // Notification or unmatched id — forward raw text.
-                        if notif_tx.send(text).await.is_err() {
-                            tracing::trace!("notification channel closed; dropping frame");
+                        // Notification or unmatched id — forward raw text
+                        // on the notification channel. Strategy A
+                        // backpressure: `try_send` first so the common
+                        // fast path avoids allocating a wake; on `Full`
+                        // emit a `tracing::warn!` and then block on
+                        // `send().await` so the slow consumer applies
+                        // backpressure to the dispatcher → TCP buffer →
+                        // server. No frames are dropped due to
+                        // backpressure; the only drop path is the
+                        // `Closed` branch below, reached after the
+                        // receiver has been dropped.
+                        match notif_tx.try_send(text) {
+                            Ok(()) => {}
+                            Err(mpsc::error::TrySendError::Full(text)) => {
+                                tracing::warn!(
+                                    capacity = notif_tx.max_capacity(),
+                                    "notification channel full; applying backpressure"
+                                );
+                                if notif_tx.send(text).await.is_err() {
+                                    tracing::trace!(
+                                        "notification channel closed; dropping frame"
+                                    );
+                                }
+                            }
+                            Err(mpsc::error::TrySendError::Closed(_)) => {
+                                tracing::trace!(
+                                    "notification channel closed; dropping frame"
+                                );
+                            }
                         }
                     }
                     Some(Ok(
@@ -1068,6 +1104,89 @@ mod tests {
             elapsed,
             serial_lower_bound,
             parallel_upper_bound
+        );
+
+        dispatcher.shutdown().await.expect("dispatcher shuts down");
+        drop(dispatcher);
+        server.await.expect("server task did not panic");
+    }
+
+    /// Regression test for issue #51: the notification channel is
+    /// bounded (Strategy A, await-send) and preserves FIFO order under
+    /// backpressure.
+    ///
+    /// Setup: the mock server sends 4 notifications with increasing
+    /// sequence numbers, then holds the socket open. The dispatcher is
+    /// created with `notification_capacity = 1`, so frames 2–4 must
+    /// force the dispatcher task to await on `notif_tx.send` (the full
+    /// path exercised by the `try_send` observability branch). The test
+    /// then sleeps long enough for all frames to traverse the pipeline
+    /// (buffered, awaiting, or on the wire), drains the receiver, and
+    /// asserts every frame arrives exactly once and in order.
+    ///
+    /// Guards against: silent frame drops under backpressure and
+    /// channel reordering when the producer has to await on a full
+    /// channel between frames.
+    #[tokio::test]
+    async fn test_notification_channel_is_bounded_and_preserves_order() {
+        const FRAME_COUNT: u64 = 4;
+        let (addr, server) = spawn_mock_server(|mut sink, _stream| async move {
+            for seq in 0..FRAME_COUNT {
+                let notif = serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "method": "subscription",
+                    "params": { "seq": seq }
+                });
+                if sink
+                    .send(Message::Text(notif.to_string().into()))
+                    .await
+                    .is_err()
+                {
+                    return;
+                }
+            }
+            // Hold the socket open so the dispatcher stream does not
+            // close before the consumer finishes draining.
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        })
+        .await;
+
+        // Capacity 1 forces every frame past the first to exercise the
+        // `try_send -> Full -> warn! -> send().await` path.
+        let dispatcher = Dispatcher::connect(
+            ws_url(addr),
+            Duration::from_secs(5),
+            Duration::from_secs(5),
+            1,
+            16,
+        )
+        .await
+        .expect("dispatcher connects");
+
+        // Let the dispatcher pull all frames off the wire. Frame 1 lands
+        // in the channel, frames 2..=4 block the dispatcher on the
+        // bounded send until the consumer drains.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        let mut received: Vec<u64> = Vec::with_capacity(FRAME_COUNT as usize);
+        for _ in 0..FRAME_COUNT {
+            let text = tokio::time::timeout(Duration::from_secs(2), dispatcher.next_notification())
+                .await
+                .expect("notification arrives within timeout")
+                .expect("notification channel still open");
+            let v: serde_json::Value = serde_json::from_str(&text).expect("frame is JSON");
+            let seq = v
+                .get("params")
+                .and_then(|p| p.get("seq"))
+                .and_then(|s| s.as_u64())
+                .expect("seq field present");
+            received.push(seq);
+        }
+
+        let expected: Vec<u64> = (0..FRAME_COUNT).collect();
+        assert_eq!(
+            received, expected,
+            "bounded notification channel must preserve FIFO order under backpressure"
         );
 
         dispatcher.shutdown().await.expect("dispatcher shuts down");

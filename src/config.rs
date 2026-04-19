@@ -37,16 +37,45 @@ pub struct WebSocketConfig {
     pub request_timeout: Duration,
     /// Notification channel capacity (frames buffered for the consumer).
     ///
-    /// This is the depth of the bounded `mpsc` that carries server-pushed
+    /// Depth of the bounded `tokio::sync::mpsc` that carries server-pushed
     /// notifications (and any unmatched frames) from the dispatcher task
     /// to [`DeribitWebSocketClient::receive_message`] /
-    /// `start_message_processing_loop`. Slow consumers apply back-pressure
-    /// on the dispatcher.
+    /// `start_message_processing_loop`.
+    ///
+    /// # Backpressure — Strategy A (await-send)
+    ///
+    /// When the channel is full the dispatcher task blocks on
+    /// `send().await`; it therefore stops polling the WebSocket stream,
+    /// the TCP recv buffer fills, and the Deribit server applies flow
+    /// control. **No frames are dropped due to backpressure; if the
+    /// notification receiver has been closed (for example during
+    /// shutdown or disconnect), the affected frames are discarded.**
+    /// Every full-channel event emits a `tracing::warn!` with the
+    /// channel capacity so slow consumers are visible in logs.
+    ///
+    /// Sizing: the default of `1024` is sufficient for normal liquid
+    /// instruments. Raise it when the consumer performs heavy synchronous
+    /// work between `next_notification` calls; lower it to tighten
+    /// end-to-end memory bounds at the cost of more frequent
+    /// backpressure warnings.
     pub notification_channel_capacity: usize,
     /// Dispatcher command channel capacity (in-flight outbound commands).
     ///
-    /// Caps the number of queued outbound commands (request sends and
-    /// shutdown) waiting to be processed by the dispatcher task.
+    /// Depth of the bounded `tokio::sync::mpsc` that carries outbound
+    /// commands (request sends, cancel-request on timeout, shutdown)
+    /// from callers to the dispatcher task.
+    ///
+    /// # Backpressure — Strategy A (await-send)
+    ///
+    /// When the channel is full, callers of
+    /// [`DeribitWebSocketClient::send_request`] /
+    /// [`DeribitWebSocketClient::disconnect`] block on `send().await`
+    /// until the dispatcher drains a slot. Blocking here means the
+    /// application is issuing requests faster than the dispatcher can
+    /// write them to the socket; the `request_timeout` bound on
+    /// `send_request` still applies, so the caller sees a
+    /// [`WebSocketError::Timeout`] if the deadline elapses while
+    /// waiting on the command channel.
     pub dispatcher_command_capacity: usize,
 }
 
