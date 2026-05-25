@@ -61,12 +61,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .get("trade_id")
                             .and_then(|id| id.as_str())
                             .unwrap_or("unknown");
+                        // Symbol the trade belongs to. Each trade carries
+                        // `instrument_name`; fall back to the channel name.
+                        let instrument = trade
+                            .get("instrument_name")
+                            .and_then(|s| s.as_str())
+                            .unwrap_or(channel);
 
                         *volume += amount;
 
                         tracing::info!(
-                            "💰 Trade #{}: {} {} @ {} (ID: {}, Time: {})",
+                            "💰 Trade #{}: {} {} {} @ {} (ID: {}, Time: {})",
                             *count,
+                            instrument,
                             direction,
                             amount,
                             price,
@@ -86,10 +93,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .get("direction")
                         .and_then(|d| d.as_str())
                         .unwrap_or("unknown");
+                    let instrument = trade
+                        .get("instrument_name")
+                        .and_then(|s| s.as_str())
+                        .unwrap_or(channel);
 
                     *volume += amount;
 
-                    tracing::info!("💰 Trade #{}: {} {} @ {}", *count, direction, amount, price);
+                    tracing::info!(
+                        "💰 Trade #{}: {} {} {} @ {}",
+                        *count,
+                        instrument,
+                        direction,
+                        amount,
+                        price
+                    );
                 }
             }
             Ok(())
@@ -124,6 +142,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "trades.ETH-PERPETUAL.100ms".to_string(),
         "trades.BTC_USDC.100ms".to_string(),
         "trades.BTC-26MAY26-74500-P.100ms".to_string(),
+        "trades.ETH-24MAY26-2150-C.100ms".to_string(),
     ];
 
     match client.subscribe(channels).await {
