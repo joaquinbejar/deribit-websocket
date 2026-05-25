@@ -3,7 +3,6 @@
 //! This example demonstrates how to subscribe to perpetual instrument updates
 //! including funding rates and perpetual-specific data.
 
-use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use std::sync::{Arc, Mutex};
 
@@ -24,9 +23,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let perpetual_updates = Arc::new(Mutex::new(0u32));
     let perpetual_count_clone = perpetual_updates.clone();
 
-    // Create client configuration
-    let config = WebSocketConfig::default();
-    let mut client = DeribitWebSocketClient::new(&config)?;
+    // Public endpoint — use the real (production) environment regardless
+    // of any `DERIBIT_WS_URL` in `.env`.
+    let mut client = DeribitWebSocketClient::new_production()?;
 
     // Set up message handler for perpetual data
     client.set_message_handler(
@@ -37,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 && let Some(params) = json_msg.get("params")
                 && let Some(channel) = params.get("channel").and_then(|c| c.as_str())
                 && channel.starts_with("perpetual.")
-                && channel.ends_with(".raw")
+                && channel.ends_with(".100ms")
             {
                 let mut count = perpetual_count_clone.lock().unwrap();
                 *count += 1;
@@ -68,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Extract instrument from channel name
                     let instrument = channel
                         .strip_prefix("perpetual.")
-                        .and_then(|s| s.strip_suffix(".raw"))
+                        .and_then(|s| s.strip_suffix(".100ms"))
                         .unwrap_or("unknown");
                     tracing::info!("   🎯 Instrument: {}", instrument);
                 }
@@ -95,10 +94,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Subscribe to perpetual channels
     tracing::info!("📊 Subscribing to perpetual updates...");
+    // `100ms` interval, not `raw`: the `raw` interval requires
+    // authentication (server code 13778) and is dropped from the
+    // confirmed list for unauthenticated callers.
     let channels = vec![
-        "perpetual.BTC-PERPETUAL.raw".to_string(),
-        "perpetual.ETH-PERPETUAL.raw".to_string(),
-        "perpetual.SOL-PERPETUAL.raw".to_string(),
+        "perpetual.BTC-PERPETUAL.100ms".to_string(),
+        "perpetual.ETH-PERPETUAL.100ms".to_string(),
+        "perpetual.SOL-PERPETUAL.100ms".to_string(),
     ];
 
     match client.subscribe(channels).await {

@@ -23,9 +23,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mark_price_updates = Arc::new(Mutex::new(0u32));
     let mark_count_clone = mark_price_updates.clone();
 
-    // Create client configuration
-    setup_logger();
-    let mut client = DeribitWebSocketClient::default();
+    // Public endpoint — use the real (production) environment regardless
+    // of any `DERIBIT_WS_URL` in `.env`.
+    let mut client = DeribitWebSocketClient::new_production()?;
 
     // Set up message handler for mark price data
     client.set_message_handler(

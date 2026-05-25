@@ -3,7 +3,6 @@
 //! This example demonstrates how to subscribe to real-time trade data
 //! and process individual trade events as they occur.
 
-use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use std::sync::{Arc, Mutex};
 
@@ -26,9 +25,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let trade_count_clone = trade_count.clone();
     let volume_clone = total_volume.clone();
 
-    // Create client configuration
-    let config = WebSocketConfig::default();
-    let mut client = DeribitWebSocketClient::new(&config)?;
+    // Trade data is public — no credentials needed. Force the production
+    // endpoint explicitly: `WebSocketConfig::default()` honours
+    // `DERIBIT_WS_URL` from `.env`, which points at testnet where there is
+    // almost no organic trade flow (the original "nothing arrives" cause).
+    let mut client = DeribitWebSocketClient::new_production()?;
 
     // Set up message handler for trade data
     client.set_message_handler(
@@ -113,10 +114,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Subscribe to trades channels
     tracing::info!("📊 Subscribing to real-time trades...");
+    // Use the `100ms` bucketed interval, not `raw`: the `raw` interval
+    // requires authentication (server code 13778,
+    // `raw_subscriptions_not_available_for_unauthorized`) and is silently
+    // dropped from the confirmed list for unauthenticated callers — the
+    // second reason "nothing arrives".
     let channels = vec![
-        "trades.BTC-PERPETUAL.raw".to_string(),
-        "trades.ETH-PERPETUAL.raw".to_string(),
-        "trades.BTC-29MAR24.raw".to_string(), // Options example
+        "trades.BTC-PERPETUAL.100ms".to_string(),
+        "trades.ETH-PERPETUAL.100ms".to_string(),
+        "trades.BTC_USDC.100ms".to_string(),
+        "trades.BTC-26MAY26-74500-P.100ms".to_string(),
     ];
 
     match client.subscribe(channels).await {

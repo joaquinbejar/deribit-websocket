@@ -24,8 +24,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Starting New Channels Subscription Example");
 
-    // Create client configuration for testnet
-    let config = WebSocketConfig::default()
+    // Public endpoint — pin the real (production) URL regardless of any
+    // `DERIBIT_WS_URL` in `.env`.
+    let config = WebSocketConfig::with_url("wss://www.deribit.com/ws/api/v2")?
         .with_heartbeat_interval(std::time::Duration::from_secs(30))
         .with_max_reconnect_attempts(3);
 

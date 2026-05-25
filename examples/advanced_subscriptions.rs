@@ -4,7 +4,6 @@
 //! - chart.trades.{instrument}.{resolution} for chart data
 //! - user.changes.{instrument}.{interval} for position changes
 
-use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use std::sync::{Arc, Mutex};
 
@@ -21,9 +20,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("🚀 Starting advanced subscriptions example...");
 
-    // Create WebSocket client for testnet
-    let config = WebSocketConfig::default();
-    let mut client = DeribitWebSocketClient::new(&config)?;
+    // Public endpoint — use the real (production) environment regardless
+    // of any `DERIBIT_WS_URL` in `.env`.
+    let mut client = DeribitWebSocketClient::new_production()?;
 
     // Statistics tracking
     let chart_messages = Arc::new(Mutex::new(0u32));

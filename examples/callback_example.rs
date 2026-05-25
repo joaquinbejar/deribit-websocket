@@ -29,9 +29,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let processed_count_clone = processed_count.clone();
     let error_count_clone = error_count.clone();
 
-    // Create client configuration
-    setup_logger();
-    let mut client = DeribitWebSocketClient::default();
+    // Public endpoint — use the real (production) environment regardless
+    // of any `DERIBIT_WS_URL` in `.env`.
+    let mut client = DeribitWebSocketClient::new_production()?;
 
     // Set up callback system
     client.set_message_handler(

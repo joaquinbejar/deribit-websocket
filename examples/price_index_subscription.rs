@@ -3,7 +3,6 @@
 //! This example demonstrates how to subscribe to Deribit price index updates
 //! for various cryptocurrencies.
 
-use deribit_websocket::config::WebSocketConfig;
 use deribit_websocket::prelude::*;
 use std::sync::{Arc, Mutex};
 
@@ -24,9 +23,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let index_updates = Arc::new(Mutex::new(0u32));
     let index_count_clone = index_updates.clone();
 
-    // Create client configuration
-    let config = WebSocketConfig::default();
-    let mut client = DeribitWebSocketClient::new(&config)?;
+    // Public endpoint — use the real (production) environment regardless
+    // of any `DERIBIT_WS_URL` in `.env`.
+    let mut client = DeribitWebSocketClient::new_production()?;
 
     // Set up message handler for price index data
     client.set_message_handler(
