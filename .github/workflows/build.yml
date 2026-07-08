@@ -28,7 +28,7 @@ jobs:
         tls: [ rustls-aws-lc, rustls-ring, native-tls ]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
@@ -57,7 +57,7 @@ jobs:
     name: mutex-check (rustls-aws-lc + rustls-ring)
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
@@ -96,7 +96,7 @@ jobs:
     name: rustdoc (-D warnings)
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
