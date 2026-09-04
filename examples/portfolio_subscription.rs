@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("🚀 Starting User Portfolio Subscription Example");
 
     // Load environment variables
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
     let client_id = std::env::var("DERIBIT_CLIENT_ID")
         .map_err(|_| "DERIBIT_CLIENT_ID environment variable not set")?;
     let client_secret = std::env::var("DERIBIT_CLIENT_SECRET")

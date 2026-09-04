@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Demonstrating: get_positions, get_account_summary, get_order_state");
 
     // Load credentials from environment
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
     let client_id = env::var("DERIBIT_CLIENT_ID").expect("DERIBIT_CLIENT_ID must be set");
     let client_secret =
         env::var("DERIBIT_CLIENT_SECRET").expect("DERIBIT_CLIENT_SECRET must be set");

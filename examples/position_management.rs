@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("⚠️  WARNING: This example may execute real trades!");
 
     // Load credentials from environment
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
     let client_id = env::var("DERIBIT_CLIENT_ID").expect("DERIBIT_CLIENT_ID must be set");
     let client_secret =
         env::var("DERIBIT_CLIENT_SECRET").expect("DERIBIT_CLIENT_SECRET must be set");

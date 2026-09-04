@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Demonstrating: public_unsubscribe_all, private_unsubscribe_all");
 
     // Load credentials from environment (optional for public, required for private)
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
     let client_id = env::var("DERIBIT_CLIENT_ID").ok();
     let client_secret = env::var("DERIBIT_CLIENT_SECRET").ok();
 
