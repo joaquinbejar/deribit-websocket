@@ -23,7 +23,7 @@ fn check_env_file() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Load environment variables
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     // Check required variables
     let required_vars = [

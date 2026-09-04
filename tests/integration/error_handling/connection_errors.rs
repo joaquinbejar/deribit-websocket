@@ -23,7 +23,7 @@ fn check_env_file() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     let required_vars = [
         "DERIBIT_CLIENT_ID",

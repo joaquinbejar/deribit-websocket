@@ -146,7 +146,7 @@ impl WebSocketConfig {
     /// reading any env var, so [`Self::from_parts`] can assume the environment
     /// is already loaded.
     fn load_env() {
-        let _ = dotenv::dotenv();
+        let _ = dotenvy::dotenv();
     }
 
     /// Private helper: populate every field except `ws_url` from environment

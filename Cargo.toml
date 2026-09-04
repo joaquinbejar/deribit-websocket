@@ -1,6 +1,6 @@
 [package]
 name = "deribit-websocket"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 authors = ["Joaquin Bejar <jb@taunais.com>"]
 description = "WebSocket client for Deribit trading platform real-time data"
@@ -65,12 +65,12 @@ rustls = { workspace = true, optional = true }
 thiserror = { workspace = true }
 url = { workspace = true }
 futures-util = { workspace = true }
-dotenv = { workspace = true }
+dotenvy = { workspace = true }
 
 
 [dev-dependencies]
 serial_test = "3.4"
-dotenv = "0.15"
+dotenvy = "0.15"
 
 # Examples are intentionally *not* gated via `required-features`:
 # `install_default_crypto_provider()` is available under every TLS
@@ -91,4 +91,4 @@ thiserror = "2.0"
 url = "2.5"
 futures-util = "0.3"
 rustls = { version = "0.23", default-features = false }
-dotenv = "0.15" 
+dotenvy = "0.15"
